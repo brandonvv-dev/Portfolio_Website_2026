@@ -14,7 +14,7 @@ const testimonials: Testimonial[] = [
     role: "Owner",
     company: "Thompson's Auto Repair",
     avatar: "/images/testimonials/sarah.svg",
-    content: "Brandon built us a custom customer management system that's been a game changer. Appointment scheduling is automated, and our customer database is finally organized. Worth every penny and he explained everything in plain English.",
+    content: "We needed a way to track appointments and customer info without the chaos of spreadsheets. Brandon built us something that actually works for our shop. Staff picked it up quickly and it's been reliable since day one.",
     rating: 5,
     project: "Business Management App"
   },
@@ -23,7 +23,7 @@ const testimonials: Testimonial[] = [
     role: "Founder",
     company: "Bella Rosa Salon",
     avatar: "/images/testimonials/emily.svg",
-    content: "The booking website Brandon created has completely transformed how we handle appointments. Clients love the online booking, and we've seen a 35% increase in bookings since launch. Professional work at a fair price.",
+    content: "The online booking system Brandon put together has cut down on phone calls significantly. A few clients had minor issues at first, but he fixed those fast. Overall solid work and fair pricing.",
     rating: 4.5,
     project: "Salon Booking System"
   },
@@ -32,7 +32,7 @@ const testimonials: Testimonial[] = [
     role: "Managing Director",
     company: "Okonkwo Legal Services",
     avatar: "/images/testimonials/michael.svg",
-    content: "Working with Brandon on our AI chatbot integration was excellent. The chatbot handles initial client inquiries 24/7, and the fine-tuned responses are surprisingly accurate for legal questions. Great communication throughout the project.",
+    content: "Had Brandon build a chatbot to handle basic client inquiries. It's not perfect for complex questions, but it saves our reception staff time on the routine stuff. Good value for what we paid.",
     rating: 5,
     project: "AI Legal Assistant Chatbot"
   },
@@ -41,29 +41,10 @@ const testimonials: Testimonial[] = [
     role: "CEO",
     company: "Foster Financial Planning",
     avatar: "/images/testimonials/lisa.svg",
-    content: "Brandon developed a React-based client portal that our advisors use daily. Clean interface, reliable performance, and he was patient with our feedback. The dashboard makes tracking portfolios much more efficient.",
+    content: "Brandon delivered a clean client portal for our advisors. There were a couple rounds of revisions on the UI, but he was responsive to feedback. Dashboard does what we need it to.",
     rating: 4.5,
     project: "Client Portal Dashboard"
   },
-  {
-    name: "Ahmed Hassan",
-    role: "Operations Manager",
-    company: "QuickShip Logistics",
-    avatar: "/images/testimonials/james.svg",
-    content: "The custom fine-tuned model Brandon built for routing optimization has saved us hours of manual work. It learns from our delivery patterns and suggests better routes. Solid technical skills and delivered on time.",
-    rating: 4,
-    project: "Fine-Tuned Routing Model"
-  },
-  {
-    name: "Patricia Morrison",
-    role: "Director",
-    company: "Morrison Medical Clinic",
-    avatar: "/images/testimonials/david.svg",
-    content: "Brandon created a patient management system that integrates perfectly with our workflow. The React frontend is intuitive for our staff, and the backend handles all our records securely. Highly recommend for healthcare projects.",
-    rating: 4.5,
-    project: "Healthcare Management System"
-  },
-
 ];
 
 export default testimonials;

@@ -31,8 +31,18 @@ import PageLoader from '../components/PageLoader.astro';
 		<slot name="head" />
 	</head>
 	<body class="min-h-screen text-slate-100 relative overflow-x-hidden" style="background: linear-gradient(180deg, #1a1f2e 0%, #0f1419 25%, #0a0e1a 50%, #0f0f1f 75%, #0f172a 100%);">
+		<!-- Milky Way Stars Background -->
+		<div class="fixed inset-0 pointer-events-none z-0">
+			<img
+				src="/images/8k_stars_milky_way.webp"
+				alt=""
+				class="w-full h-full object-cover opacity-[0.28]"
+				loading="eager"
+				decoding="async"
+			/>
+		</div>
 		<!-- Background accent elements -->
-		<div class="fixed inset-0 pointer-events-none overflow-hidden">
+		<div class="fixed inset-0 pointer-events-none overflow-hidden z-[1]">
 			<div class="absolute -top-40 -right-40 w-80 h-80 bg-blue-600/5 rounded-full blur-3xl"></div>
 			<div class="absolute bottom-0 left-0 w-96 h-96 bg-slate-700/3 rounded-full blur-3xl"></div>
 			<div class="absolute top-1/2 right-1/4 w-64 h-64 bg-slate-600/2 rounded-full blur-3xl"></div>
