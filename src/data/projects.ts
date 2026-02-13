@@ -140,9 +140,15 @@ export const projects: Project[] = [
     longDescription: "Engineered an automated pipeline for fine-tuning large language models on custom datasets. Implemented LoRA/QLoRA techniques for efficient training, with automated evaluation metrics and A/B testing framework. Reduced training costs by 60% while improving model performance on domain-specific tasks. Handles datasets up to 50GB with distributed training across multiple GPUs.",
     tech: ["Python", "PyTorch", "Hugging Face Transformers", "CUDA", "MLflow", "Docker", "AWS SageMaker"],
     github: "https://github.com/Brandon255-rgb/llm-finetuning-pipeline",
-    image: "/images/Proof of Work/ai-invoice-manager/home.webp",
+    image: "/images/Proof of Work/finetuning-ai/finetuning (1).png",
     images: [
-      "/images/Proof of Work/ai-invoice-manager/home.webp"
+      "/images/Proof of Work/finetuning-ai/finetuning (1).png",
+      "/images/Proof of Work/finetuning-ai/finetuning (2).png",
+      "/images/Proof of Work/finetuning-ai/finetuning (3).png",
+      "/images/Proof of Work/finetuning-ai/finetuning (4).png",
+      "/images/Proof of Work/finetuning-ai/finetuning (5).png",
+      "/images/Proof of Work/finetuning-ai/finetuning (6).png",
+      "/images/Proof of Work/finetuning-ai/finetuning (7).png"
     ],
     video: "/videos/llm-pipeline-demo.mp4",
     featured: true,
