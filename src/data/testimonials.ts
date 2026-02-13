@@ -36,15 +36,6 @@ const testimonials: Testimonial[] = [
     rating: 5,
     project: "AI Legal Assistant Chatbot"
   },
-  {
-    name: "Rachel Foster",
-    role: "CEO",
-    company: "Foster Financial Planning",
-    avatar: "/images/testimonials/lisa.svg",
-    content: "Brandon delivered a clean client portal for our advisors. There were a couple rounds of revisions on the UI, but he was responsive to feedback. Dashboard does what we need it to.",
-    rating: 4.5,
-    project: "Client Portal Dashboard"
-  },
 ];
 
 export default testimonials;

@@ -349,19 +349,30 @@ import ProjectModal from './ProjectModal.astro';
       </div>
       
       <!-- Featured AI Project -->
-      {aiProjects.map((project) => (
+      {aiProjects.map((project, projectIndex) => (
         <div class="ai-featured-project">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {project.image && (
+            {project.images && project.images.length > 0 && (
               <div class="order-2 lg:order-1">
-                <div class="aspect-video rounded-2xl overflow-hidden border border-purple-500/30 shadow-2xl shadow-purple-500/18 relative group/img">
-                  <div class="absolute inset-0 bg-linear-to-t from-purple-900/50 via-transparent to-transparent z-10"></div>
-                  <img 
-                    src={project.image} 
-                    alt={project.title}
-                    class="w-full h-full object-cover transform group-hover/img:scale-110 transition-transform duration-700"
-                    loading="lazy"
-                  />
+                <div class="aspect-video rounded-2xl overflow-hidden border border-purple-500/30 shadow-2xl shadow-purple-500/18 relative group/img ai-slideshow-container" id={`ai-slideshow-${projectIndex}`}>
+                  <div class="absolute inset-0 bg-linear-to-t from-purple-900/50 via-transparent to-transparent z-10 pointer-events-none"></div>
+                  {project.images.map((img, imgIndex) => (
+                    <img
+                      src={img}
+                      alt={`${project.title} - Image ${imgIndex + 1}`}
+                      class={`ai-slideshow-image w-full h-full object-cover absolute inset-0 transition-opacity duration-500 ${imgIndex === 0 ? 'opacity-100' : 'opacity-0'}`}
+                      loading="lazy"
+                    />
+                  ))}
+                  <!-- Slideshow indicators -->
+                  <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+                    {project.images.map((_, dotIndex) => (
+                      <button
+                        class={`ai-slideshow-dot w-2 h-2 rounded-full transition-all duration-300 ${dotIndex === 0 ? 'bg-purple-400 w-6' : 'bg-white/40 hover:bg-white/60'}`}
+                        data-index={dotIndex}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -571,6 +582,30 @@ import ProjectModal from './ProjectModal.astro';
       font-size: 0.875rem;
     }
   }
+
+  /* AI Slideshow Styles */
+  .ai-slideshow-container {
+    position: relative;
+  }
+
+  .ai-slideshow-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .ai-slideshow-dot {
+    cursor: pointer;
+    border: none;
+    outline: none;
+  }
+
+  .ai-slideshow-dot:focus {
+    outline: 2px solid rgba(168, 85, 247, 0.5);
+    outline-offset: 2px;
+  }
 </style>
 
 <script>
@@ -611,6 +646,74 @@ import ProjectModal from './ProjectModal.astro';
     document.addEventListener('DOMContentLoaded', initShowMoreButton);
   } else {
     initShowMoreButton();
+  }
+
+  // AI Slideshow functionality
+  function initAISlideshows() {
+    const slideshowContainers = document.querySelectorAll('.ai-slideshow-container');
+
+    slideshowContainers.forEach((container) => {
+      const images = container.querySelectorAll('.ai-slideshow-image');
+      const dots = container.querySelectorAll('.ai-slideshow-dot');
+      if (images.length === 0) return;
+
+      let currentIndex = 0;
+      let intervalId: ReturnType<typeof setInterval>;
+
+      const showSlide = (index: number) => {
+        images.forEach((img, i) => {
+          if (i === index) {
+            img.classList.remove('opacity-0');
+            img.classList.add('opacity-100');
+          } else {
+            img.classList.remove('opacity-100');
+            img.classList.add('opacity-0');
+          }
+        });
+
+        dots.forEach((dot, i) => {
+          if (i === index) {
+            dot.classList.add('bg-purple-400', 'w-6');
+            dot.classList.remove('bg-white/40');
+          } else {
+            dot.classList.remove('bg-purple-400', 'w-6');
+            dot.classList.add('bg-white/40');
+          }
+        });
+      };
+
+      const nextSlide = () => {
+        currentIndex = (currentIndex + 1) % images.length;
+        showSlide(currentIndex);
+      };
+
+      // Auto-advance slideshow
+      intervalId = setInterval(nextSlide, 2500);
+
+      // Click on dots to navigate
+      dots.forEach((dot, index) => {
+        dot.addEventListener('click', () => {
+          currentIndex = index;
+          showSlide(currentIndex);
+          // Reset interval on manual navigation
+          clearInterval(intervalId);
+          intervalId = setInterval(nextSlide, 2500);
+        });
+      });
+
+      // Pause on hover
+      container.addEventListener('mouseenter', () => clearInterval(intervalId));
+      container.addEventListener('mouseleave', () => {
+        intervalId = setInterval(nextSlide, 2500);
+      });
+    });
+  }
+
+  // Initialize slideshows
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAISlideshows);
+  } else {
+    initAISlideshows();
   }
 </script>
 
