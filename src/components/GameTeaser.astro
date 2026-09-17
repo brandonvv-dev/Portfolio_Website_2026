@@ -1,0 +1,114 @@
+---
+import CvGameButton from './CvGameButton.astro';
+---
+
+<section class="teaser">
+  <div class="teaser-floor" aria-hidden="true"></div>
+
+  <div class="shell teaser-inner">
+    <p class="t-eyebrow reveal">The other CV</p>
+
+    <h2 class="t-headline t-shine reveal" style="--d:80ms">
+      Don&rsquo;t read my CV.<br />Drive through it.
+    </h2>
+
+    <p class="t-lede teaser-lede reveal" style="--d:160ms">
+      A real 3D world with physics, a car you control, and my entire career laid
+      out on the floor. Drive over a project to open it. Crash into things if you
+      prefer.
+    </p>
+
+    <ul class="teaser-facts reveal" style="--d:240ms">
+      <li><strong>WebGL</strong><span>three.js renderer</span></li>
+      <li><strong>Physics</strong><span>cannon-es raycast vehicle</span></li>
+      <li><strong>Touch</strong><span>joystick on mobile</span></li>
+      <li><strong>0&nbsp;KB</strong><span>loaded until you click</span></li>
+    </ul>
+
+    <div class="teaser-cta reveal" style="--d:320ms">
+      <CvGameButton />
+    </div>
+  </div>
+</section>
+
+<style>
+  .teaser {
+    position: relative;
+    overflow: hidden;
+    border-top: 1px solid var(--hairline);
+    isolation: isolate;
+  }
+
+  /* Perspective floor receding to a horizon — a road without a road. */
+  .teaser-floor {
+    position: absolute;
+    inset: 38% 0 0;
+    z-index: -1;
+    background-image:
+      linear-gradient(rgba(41, 151, 255, 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(41, 151, 255, 0.35) 1px, transparent 1px);
+    background-size: 64px 64px;
+    transform: perspective(340px) rotateX(58deg);
+    transform-origin: 50% 0;
+    mask-image: linear-gradient(#000, transparent 72%);
+    animation: floor 2.6s linear infinite;
+  }
+  @keyframes floor {
+    to {
+      background-position-y: 64px;
+    }
+  }
+
+  .teaser-inner {
+    padding-block: clamp(5rem, 13vw, 9rem);
+    display: grid;
+    gap: 1.2rem;
+    justify-items: center;
+    text-align: center;
+  }
+  .teaser-inner h2 {
+    margin: 0;
+  }
+  .teaser-lede {
+    margin: 0;
+    max-width: 50ch;
+  }
+
+  .teaser-facts {
+    list-style: none;
+    margin: 1.5rem 0 0.5rem;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem 2rem;
+    width: min(100%, 640px);
+  }
+  .teaser-facts li {
+    display: grid;
+    gap: 0.15rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    background: rgba(10, 10, 12, 0.6);
+    backdrop-filter: blur(10px);
+  }
+  .teaser-facts strong {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+  .teaser-facts span {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+
+  .teaser-cta {
+    margin-top: 0.75rem;
+  }
+
+  @media (min-width: 720px) {
+    .teaser-facts {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+</style>

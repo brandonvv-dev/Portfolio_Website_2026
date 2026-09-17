@@ -1,0 +1,234 @@
+---
+const links = [
+  { href: '#work', label: 'Work' },
+  { href: '#about', label: 'About' },
+  { href: '#open-source', label: 'Open source' },
+  { href: '#contact', label: 'Contact' },
+];
+---
+
+<!-- Watched by motion.ts: once this scrolls out, the bar goes solid. -->
+<div data-nav-sentinel aria-hidden="true" class="absolute top-0 h-[70vh] w-px"></div>
+
+<header data-nav class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="nav-brand" aria-label="Brandon van Vuuren, home">
+      <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="currentColor">
+        <path d="M4 3h8.2a5.2 5.2 0 0 1 3.4 9.1A5.5 5.5 0 0 1 13.4 21H4V3Zm3.4 3v4.4h4.5a2.2 2.2 0 0 0 0-4.4H7.4Zm0 7.4V18h5.6a2.3 2.3 0 0 0 0-4.6H7.4Z"/>
+      </svg>
+      <span>Brandon van Vuuren</span>
+    </a>
+
+    <nav class="nav-links" aria-label="Sections">
+      {links.map((l) => <a href={l.href}>{l.label}</a>)}
+    </nav>
+
+    <a href="/drive" class="nav-cta">
+      <span class="nav-cta-dot" aria-hidden="true"></span>
+      Drive my CV
+    </a>
+
+    <button
+      data-nav-toggle
+      class="nav-burger"
+      type="button"
+      aria-expanded="false"
+      aria-controls="nav-sheet"
+      aria-label="Menu"
+    >
+      <span></span><span></span>
+    </button>
+  </div>
+
+  <div class="nav-progress"><i class="scroll-progress"></i></div>
+</header>
+
+<div id="nav-sheet" data-nav-sheet class="nav-sheet">
+  {links.map((l) => <a href={l.href}>{l.label}<span aria-hidden="true">›</span></a>)}
+  <a href="/drive" class="nav-sheet-cta">Drive my CV<span aria-hidden="true">›</span></a>
+</div>
+
+<style>
+  .nav {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 100;
+    height: 52px;
+    transition: background 0.4s var(--ease), backdrop-filter 0.4s var(--ease),
+      border-color 0.4s var(--ease);
+    border-bottom: 1px solid transparent;
+  }
+
+  .nav.is-solid {
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom-color: var(--hairline);
+  }
+
+  .nav-inner {
+    height: 52px;
+    max-width: var(--measure);
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .nav-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-right: auto;
+    white-space: nowrap;
+  }
+
+  .nav-links {
+    display: none;
+    gap: 1.75rem;
+  }
+
+  .nav-links a {
+    color: var(--text);
+    opacity: 0.82;
+    text-decoration: none;
+    font-size: 0.8125rem;
+    letter-spacing: -0.005em;
+    transition: opacity 0.2s var(--ease);
+  }
+  .nav-links a:hover {
+    opacity: 1;
+  }
+
+  .nav-cta {
+    display: none;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.36rem 0.85rem;
+    border-radius: 980px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.8125rem;
+    font-weight: 550;
+    text-decoration: none;
+    transition: background 0.2s var(--ease);
+  }
+  .nav-cta:hover {
+    background: var(--accent-hi);
+  }
+
+  .nav-cta-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+    animation: ping 2.4s var(--ease) infinite;
+  }
+  @keyframes ping {
+    70%,
+    100% {
+      box-shadow: 0 0 0 7px rgba(255, 255, 255, 0);
+    }
+  }
+
+  .nav-progress {
+    height: 1px;
+    background: transparent;
+  }
+  .nav-progress i {
+    display: block;
+    height: 1px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-hi));
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+  }
+
+  .nav-burger {
+    display: grid;
+    place-content: center;
+    gap: 5px;
+    width: 40px;
+    height: 40px;
+    margin-right: -8px;
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+  .nav-burger span {
+    display: block;
+    width: 17px;
+    height: 1.5px;
+    background: var(--text);
+    border-radius: 2px;
+    transition: transform 0.3s var(--ease), opacity 0.3s var(--ease);
+  }
+  .nav-burger[aria-expanded='true'] span:first-child {
+    transform: translateY(3.25px) rotate(45deg);
+  }
+  .nav-burger[aria-expanded='true'] span:last-child {
+    transform: translateY(-3.25px) rotate(-45deg);
+  }
+
+  .nav-sheet {
+    position: fixed;
+    inset: 52px 0 auto;
+    z-index: 99;
+    background: rgba(0, 0, 0, 0.94);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 1rem var(--gutter) 2rem;
+    display: grid;
+    /* Collapsed by default; grid-template-rows animates cleanly. */
+    grid-template-rows: 0fr;
+    opacity: 0;
+    pointer-events: none;
+    transition: grid-template-rows 0.45s var(--ease), opacity 0.3s var(--ease),
+      padding 0.45s var(--ease);
+  }
+  .nav-sheet[data-open] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .nav-sheet > * {
+    min-height: 0;
+  }
+
+  .nav-sheet a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 0;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    border-bottom: 1px solid var(--hairline);
+    overflow: hidden;
+  }
+  .nav-sheet a span {
+    color: var(--text-dim);
+  }
+  .nav-sheet-cta {
+    color: var(--accent) !important;
+  }
+
+  @media (min-width: 900px) {
+    .nav-links,
+    .nav-cta {
+      display: flex;
+    }
+    .nav-burger,
+    .nav-sheet {
+      display: none;
+    }
+  }
+</style>

@@ -1,0 +1,149 @@
+---
+import { getRecentRepos, formatDate } from '../utils/github';
+
+const repos = (await getRecentRepos(9)).filter((r) => !r.private);
+
+const langColor: Record<string, string> = {
+  TypeScript: '#3178c6',
+  JavaScript: '#f1e05a',
+  Python: '#3572A5',
+  'C#': '#8b2be2',
+  Astro: '#ff5d01',
+  HTML: '#e34c26',
+  CSS: '#563d7c',
+  Shell: '#89e051',
+};
+---
+
+{
+  repos.length > 0 && (
+    <section id="open-source" class="repos">
+      <div class="shell">
+        <header class="repos-head">
+          <div>
+            <p class="t-eyebrow reveal">Open source</p>
+            <h2 class="t-headline t-shine reveal" style="--d:80ms">
+              Live from GitHub.
+            </h2>
+          </div>
+          <a
+            class="link-arrow reveal"
+            style="--d:160ms"
+            href="https://github.com/Brandon255-rgb"
+            target="_blank"
+            rel="noopener"
+          >
+            All repositories
+          </a>
+        </header>
+
+        <ul class="repo-grid">
+          {repos.map((r, i) => (
+            <li class="reveal" style={`--d:${i * 60}ms`}>
+              <a class="repo card" href={r.html_url} target="_blank" rel="noopener">
+                <h3>{r.name}</h3>
+                <p>{r.description ?? 'No description yet.'}</p>
+                <footer>
+                  {r.language && (
+                    <span class="repo-lang">
+                      <i style={`background:${langColor[r.language] ?? '#8e8e93'}`} />
+                      {r.language}
+                    </span>
+                  )}
+                  <span>★ {r.stargazers_count}</span>
+                  <span class="repo-date">Updated {formatDate(r.updated_at)}</span>
+                </footer>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
+
+<style>
+  .repos {
+    padding-block: clamp(5rem, 12vw, 9rem);
+    border-top: 1px solid var(--hairline);
+  }
+
+  .repos-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: clamp(2.5rem, 6vw, 4rem);
+  }
+  .repos-head h2 {
+    margin: 0.5rem 0 0;
+  }
+
+  .repo-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+  }
+
+  .repo {
+    display: grid;
+    gap: 0.6rem;
+    align-content: start;
+    height: 100%;
+    padding: 1.4rem;
+    text-decoration: none;
+    color: inherit;
+    background: linear-gradient(180deg, #131315, #0b0b0d);
+    transition: transform 0.35s var(--ease-out), border-color 0.3s var(--ease),
+      background 0.3s var(--ease);
+  }
+  .repo:hover {
+    transform: translateY(-4px);
+    border-color: var(--hairline-strong);
+    background: linear-gradient(180deg, #18181b, #0d0d10);
+  }
+
+  .repo h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: var(--accent);
+    word-break: break-word;
+  }
+  .repo p {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .repo footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.9rem;
+    margin-top: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+  .repo-lang {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .repo-lang i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+  }
+  .repo-date {
+    margin-left: auto;
+  }
+</style>

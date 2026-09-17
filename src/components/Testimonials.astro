@@ -2,313 +2,120 @@
 import testimonials from '../data/testimonials';
 ---
 
-<section id="testimonials" class="py-32 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-  <!-- Background with stars showing through -->
-  <div class="absolute inset-0 bg-linear-to-b from-slate-950/[0.72] via-slate-900/[0.72] to-slate-950/[0.72]"></div>
-  <div class="absolute top-1/3 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full filter blur-3xl animate-pulse" style="animation-duration: 4s;"></div>
-  <div class="absolute bottom-1/3 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full filter blur-3xl animate-pulse" style="animation-duration: 5s;"></div>
-  
-  <div class="max-w-7xl mx-auto relative z-10">
-    <div class="text-center mb-20">
-      <div class="inline-block mb-4">
-        <span class="px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-400 text-sm font-semibold backdrop-blur-sm flex items-center gap-2">
-          <svg aria-hidden="true" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-          </svg>
-          Client Testimonials
-        </span>
-      </div>
-      <h2 class="text-4xl sm:text-5xl md:text-6xl font-black text-white mb-6 tracking-tight">
-        What Clients <span class="bg-clip-text text-transparent" style="background-image: radial-gradient(circle, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);">Say</span>
-      </h2>
-      <p class="text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed">
-        Real feedback from real projects. No fluff, just results that matter.
-      </p>
-    </div>
-    
-    <!-- Stats Grid -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20 max-w-4xl mx-auto">
-      <div class="stat-box">
-        <div class="stat-number">15+</div>
-        <div class="stat-label">Happy Clients</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-number">100%</div>
-        <div class="stat-label">Success Rate</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-number">30+</div>
-        <div class="stat-label">Projects Done</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-number">4.8</div>
-        <div class="stat-label">Avg Rating</div>
-      </div>
-    </div>
-    
-    <!-- Testimonials Grid -->
-    <div class="testimonials-grid">
-      {testimonials.map((testimonial, index) => (
-        <article class="testimonial-card" style={`animation-delay: ${index * 0.1}s;`}>
-          <!-- Stars -->
-          <div class="flex gap-1 mb-4">
-            {Array.from({ length: Math.floor(testimonial.rating) }).map(() => (
-              <svg aria-hidden="true" class="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-              </svg>
+<section id="testimonials" class="quotes">
+  <div class="shell quotes-head">
+    <p class="t-eyebrow reveal">Clients</p>
+    <h2 class="t-headline t-shine reveal" style="--d:80ms">
+      What it&rsquo;s like<br />on the other side.
+    </h2>
+  </div>
+
+  <div class="rail quotes-rail">
+    {
+      testimonials.map((t, i) => (
+        <figure class="quote card reveal" style={`--d:${i * 100}ms`}>
+          <div class="quote-stars" aria-label={`${t.rating} out of 5`}>
+            {Array.from({ length: 5 }, (_, n) => (
+              <span class={n < Math.floor(t.rating) ? 'on' : n < t.rating ? 'half' : ''}>★</span>
             ))}
-            {testimonial.rating % 1 !== 0 && (
-              <svg aria-hidden="true" class="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                <defs>
-                  <linearGradient id={`half-${index}`}>
-                    <stop offset="50%" stop-color="currentColor" />
-                    <stop offset="50%" stop-color="rgb(100, 116, 139)" />
-                  </linearGradient>
-                </defs>
-                <path fill={`url(#half-${index})`} d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-              </svg>
-            )}
           </div>
-          
-          <!-- Content -->
-          <p class="testimonial-content">
-            "{testimonial.content}"
-          </p>
-          
-          <!-- Project Badge -->
-          <div class="project-badge">
-            <svg aria-hidden="true" class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-            <span>{testimonial.project}</span>
-          </div>
-          
-          <!-- Author -->
-          <div class="testimonial-author">
-            <img 
-              src={testimonial.avatar} 
-              alt={testimonial.name}
-              width="56"
-              height="56"
-              decoding="async"
-              loading="lazy"
-              class="author-avatar"
-            />
-            <div>
-              <div class="author-name">{testimonial.name}</div>
-              <div class="author-role">{testimonial.role}</div>
-              <div class="author-company">{testimonial.company}</div>
-            </div>
-          </div>
-          
-          <!-- Quote icon -->
-          <div class="quote-icon">
-            <svg aria-hidden="true" class="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
-            </svg>
-          </div>
-        </article>
-      ))}
-    </div>
-    
-    <!-- CTA -->
-    <div class="text-center mt-20">
-      <p class="text-lg text-slate-400 mb-6">
-        Want to be the next success story?
-      </p>
-      <a 
-        href="#contact"
-        class="inline-flex items-center gap-3 px-8 py-4 bg-linear-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg shadow-amber-500/23 hover:shadow-amber-500/36 hover:scale-105 border-2 border-blue-950"
-      >
-        <span>Start Your Project</span>
-        <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
-        </svg>
-      </a>
-    </div>
+
+          <blockquote>{t.content}</blockquote>
+
+          <figcaption>
+            <img src={t.avatar} alt="" width="40" height="40" loading="lazy" />
+            <span>
+              <strong>{t.name}</strong>
+              <small>
+                {t.role}, {t.company}
+              </small>
+            </span>
+          </figcaption>
+
+          <p class="quote-project">{t.project}</p>
+        </figure>
+      ))
+    }
   </div>
 </section>
 
 <style>
-  .stat-box {
-    position: relative;
-    padding: 2rem 1.5rem;
-    background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8));
-    backdrop-filter: blur(20px);
-    border-radius: 1.25rem;
-    border: 1px solid rgba(100, 116, 139, 0.2);
-    text-align: center;
-    transition: all 0.3s ease;
-    overflow: hidden;
+  .quotes {
+    padding-block: clamp(5rem, 12vw, 9rem);
+    border-top: 1px solid var(--hairline);
   }
-  
-  .stat-box::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.05), transparent 70%);
-    opacity: 0;
-    transition: opacity 0.3s ease;
+
+  .quotes-head {
+    margin-bottom: clamp(2.5rem, 6vw, 4rem);
   }
-  
-  .stat-box:hover::before {
-    opacity: 1;
+  .quotes-head h2 {
+    margin: 0.5rem 0 0;
   }
-  
-  .stat-box:hover {
-    transform: translateY(-4px);
-    border-color: rgba(59, 130, 246, 0.4);
+
+  .quotes-rail {
+    /* Rail is edge-to-edge; the shell gutter keeps card 1 aligned with the heading */
+    align-items: stretch;
   }
-  
-  .stat-number {
-    font-size: 2.5rem;
-    font-weight: 900;
-    background: linear-gradient(135deg, #fbbf24, #f59e0b);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin-bottom: 0.5rem;
-    line-height: 1;
-  }
-  
-  .stat-label {
-    font-size: 0.875rem;
-    color: #94a3b8;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  
-  .testimonials-grid {
+
+  .quote {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 2rem;
+    gap: 1rem;
+    align-content: start;
+    width: min(84vw, 400px);
+    padding: 1.6rem;
+    margin: 0;
+    background: linear-gradient(180deg, #131315, #0b0b0d);
   }
-  
-  .testimonial-card {
-    position: relative;
-    padding: 2.5rem;
-    background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8));
-    backdrop-filter: blur(20px);
-    border-radius: 1.5rem;
-    border: 1px solid rgba(100, 116, 139, 0.2);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    animation: fadeInUp 0.6s ease-out forwards;
-    opacity: 0;
-    overflow: hidden;
+
+  .quote-stars {
+    display: flex;
+    gap: 2px;
+    font-size: 0.875rem;
+    color: #3a3a3e;
   }
-  
-  .testimonial-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #fbbf24, #f59e0b);
-    opacity: 0;
-    transition: opacity 0.3s ease;
+  .quote-stars .on,
+  .quote-stars .half {
+    color: #f5a623;
   }
-  
-  .testimonial-card:hover::before {
-    opacity: 1;
+  .quote-stars .half {
+    opacity: 0.55;
   }
-  
-  .testimonial-card:hover {
-    transform: translateY(-8px);
-    border-color: rgba(251, 191, 36, 0.3);
-    box-shadow: 0 20px 60px rgba(251, 191, 36, 0.08);
+
+  .quote blockquote {
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    letter-spacing: -0.008em;
+    color: var(--text-muted);
   }
-  
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateY(30px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  .testimonial-content {
-    color: #cbd5e1;
-    font-size: 1rem;
-    line-height: 1.8;
-    margin-bottom: 1.5rem;
-    position: relative;
-  }
-  
-  .project-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid rgba(59, 130, 246, 0.2);
-    border-radius: 9999px;
-    color: #60a5fa;
-    font-size: 0.75rem;
-    font-weight: 600;
-    margin-bottom: 1.5rem;
-  }
-  
-  .testimonial-author {
+
+  .quote figcaption {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--hairline);
   }
-  
-  .author-avatar {
-    width: 56px;
-    height: 56px;
+  .quote figcaption img {
     border-radius: 50%;
-    border: 2px solid rgba(251, 191, 36, 0.3);
-    background: rgba(30, 41, 59, 0.8);
+    background: var(--surface-2);
   }
-  
-  .author-name {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #f1f5f9;
-    margin-bottom: 0.125rem;
+  .quote figcaption span {
+    display: grid;
   }
-  
-  .author-role {
-    font-size: 0.875rem;
+  .quote figcaption strong {
+    font-size: 0.9375rem;
     font-weight: 600;
-    color: #94a3b8;
-    margin-bottom: 0.125rem;
+    letter-spacing: -0.012em;
   }
-  
-  .author-company {
+  .quote figcaption small {
     font-size: 0.75rem;
-    color: #64748b;
+    color: var(--text-dim);
   }
-  
-  .quote-icon {
-    position: absolute;
-    top: 1.5rem;
-    right: 1.5rem;
-    color: rgba(251, 191, 36, 0.1);
-    pointer-events: none;
-  }
-  
-  @media (max-width: 640px) {
-    .testimonials-grid {
-      grid-template-columns: 1fr;
-    }
-    
-    .testimonial-card {
-      padding: 2rem;
-    }
-    
-    .stat-number {
-      font-size: 2rem;
-    }
-    
-    .quote-icon {
-      display: none;
-    }
+
+  .quote-project {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--accent);
   }
 </style>

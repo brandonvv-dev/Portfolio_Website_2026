@@ -1,0 +1,231 @@
+---
+import { projects } from '../data/projects';
+
+const featured = projects.filter((p) => p.featured);
+---
+
+<section id="work" class="work">
+  <header class="work-head shell">
+    <p class="t-eyebrow reveal">Selected work</p>
+    <h2 class="t-headline t-shine reveal" style="--d:80ms">
+      Things I built that<br />other people actually use.
+    </h2>
+    <p class="t-body work-lede reveal" style="--d:160ms">
+      Streaming pipelines, assessment platforms, document AI, booking systems.
+      Scroll &mdash; each one stacks on the last.
+    </p>
+  </header>
+
+  <div class="stack shell">
+    {
+      featured.map((p, i) => (
+        <article class="stack-item" style={`--i:${i}`}>
+          <div class="card proj reveal">
+            <div class="proj-copy">
+              <span class="proj-index">{String(i + 1).padStart(2, '0')}</span>
+              <h3 class="t-title">{p.title}</h3>
+              <p class="t-body proj-desc">{p.longDescription}</p>
+
+              <ul class="proj-tech">
+                {p.tech.slice(0, 7).map((t) => (
+                  <li>{t}</li>
+                ))}
+              </ul>
+
+              <div class="proj-links">
+                {p.github && (
+                  <a class="link-arrow" href={p.github} target="_blank" rel="noopener">
+                    Source
+                  </a>
+                )}
+                {p.live && (
+                  <a class="link-arrow" href={p.live} target="_blank" rel="noopener">
+                    Live site
+                  </a>
+                )}
+                {p.video && (
+                  <a class="link-arrow" href={p.video} target="_blank" rel="noopener">
+                    Watch demo
+                  </a>
+                )}
+              </div>
+            </div>
+
+            <div class="proj-shots">
+              {/* Native scroll-snap rail — swipeable, no JS carousel. */}
+              <div class="rail proj-rail">
+                {(p.images?.length ? p.images : [p.image!]).slice(0, 8).map((src, n) => (
+                  <figure class="shot tilt" data-tilt="4">
+                    <div class="shot-bar" aria-hidden="true">
+                      <i /><i /><i />
+                    </div>
+                    <img
+                      src={src}
+                      alt={`${p.title} screenshot ${n + 1}`}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </figure>
+                ))}
+              </div>
+              <p class="proj-hint" aria-hidden="true">Swipe &rarr;</p>
+            </div>
+          </div>
+        </article>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  .work {
+    padding-block: clamp(5rem, 12vw, 9rem) 4rem;
+  }
+
+  .work-head {
+    display: grid;
+    gap: 1rem;
+    max-width: 900px;
+    margin-bottom: clamp(3rem, 7vw, 5rem);
+  }
+  .work-head h2 {
+    margin: 0;
+  }
+  .work-lede {
+    max-width: 52ch;
+    margin: 0;
+  }
+
+  /* Each card pins slightly lower than the last, so the stack shows its edges. */
+  .stack {
+    display: grid;
+    gap: clamp(1.5rem, 4vw, 2.5rem);
+    padding-bottom: 30vh;
+  }
+  .stack-item {
+    position: sticky;
+    top: calc(5.5rem + var(--i) * 14px);
+  }
+
+  .proj {
+    display: grid;
+    gap: 0;
+    background: linear-gradient(180deg, #161618, #0c0c0e);
+    box-shadow: 0 -1px 0 0 rgba(255, 255, 255, 0.06) inset,
+      0 40px 80px -40px rgba(0, 0, 0, 1);
+  }
+
+  .proj-copy {
+    padding: clamp(1.75rem, 4vw, 2.75rem);
+    display: grid;
+    gap: 1rem;
+    align-content: start;
+  }
+
+  .proj-index {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+  }
+  .proj-copy h3 {
+    margin: 0;
+    color: var(--text);
+    text-wrap: balance;
+  }
+  .proj-desc {
+    margin: 0;
+    max-width: 58ch;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
+
+  .proj-tech {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    list-style: none;
+    margin: 0.25rem 0 0;
+    padding: 0;
+  }
+  .proj-tech li {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    padding: 0.3rem 0.65rem;
+    border: 1px solid var(--hairline);
+    border-radius: 980px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .proj-links {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 0.5rem;
+    font-size: 0.9375rem;
+  }
+
+  .proj-shots {
+    position: relative;
+    padding-bottom: 1.75rem;
+    min-width: 0;
+  }
+  .proj-rail {
+    --gutter: clamp(1.75rem, 4vw, 2.75rem);
+    padding-block: 0 1rem;
+  }
+
+  .shot {
+    margin: 0;
+    width: min(78vw, 480px);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--hairline);
+    background: #0a0a0c;
+    box-shadow: 0 24px 50px -30px rgba(0, 0, 0, 1);
+  }
+  .shot-bar {
+    display: flex;
+    gap: 5px;
+    padding: 8px 10px;
+    background: #17171a;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .shot-bar i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3a3a3e;
+  }
+  .shot img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+    object-position: top center;
+  }
+
+  .proj-hint {
+    margin: 0;
+    padding-inline: clamp(1.75rem, 4vw, 2.75rem);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+
+  @media (min-width: 1000px) {
+    .proj {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      align-items: center;
+    }
+    .proj-shots {
+      padding-block: 1.75rem;
+    }
+    .proj-rail {
+      --gutter: 0rem;
+      padding-right: clamp(1.75rem, 4vw, 2.75rem);
+    }
+    .proj-hint {
+      display: none;
+    }
+  }
+</style>

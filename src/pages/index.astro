@@ -1,98 +1,24 @@
 ---
-// src/pages/index.astro
 import Layout from '../layouts/Layout.astro';
-import Navigation from '../components/Navigation.astro';
+import Nav from '../components/Nav.astro';
 import Hero from '../components/Hero.astro';
+import Work from '../components/Work.astro';
 import About from '../components/About.astro';
-import FeaturedProjects from '../components/FeaturedProjects.astro';
-import GitHubRepos from '../components/GitHubRepos.astro';
+import GameTeaser from '../components/GameTeaser.astro';
 import Testimonials from '../components/Testimonials.astro';
+import Repos from '../components/Repos.astro';
 import Contact from '../components/Contact.astro';
 ---
 
-<Layout title="Brandon - Full-Stack Developer & AI Engineer">
-  <Navigation />
-  <Hero />
-  <About />
-  <FeaturedProjects />
-  <div id="github">
-    <GitHubRepos />
-  </div>
-  <Testimonials />
-  <Contact />
-  
-  <!-- Performance optimization script -->
-  <script>
-    // Passive event listeners for better scroll performance
-    if (typeof window !== 'undefined') {
-      const supportsPassive = (() => {
-        let support = false;
-        try {
-          const opts = Object.defineProperty({}, 'passive', {
-            get() { support = true; }
-          });
-          window.addEventListener('test', null, opts);
-          window.removeEventListener('test', null, opts);
-        } catch (e) {}
-        return support;
-      })();
-
-      if (supportsPassive) {
-        // Add passive listeners to improve scroll performance
-        document.addEventListener('touchstart', () => {}, { passive: true });
-        document.addEventListener('touchmove', () => {}, { passive: true });
-        document.addEventListener('wheel', () => {}, { passive: true });
-      }
-
-      // Intersection Observer for lazy animations
-      const observerOptions = {
-        root: null,
-        rootMargin: '50px',
-        threshold: 0.1
-      };
-
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-            observer.unobserve(entry.target);
-          }
-        });
-      }, observerOptions);
-
-      // Observe elements when DOM is ready
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-          document.querySelectorAll('.project-card, .skill-card, .ai-service-card').forEach(el => {
-            observer.observe(el);
-          });
-        });
-      } else {
-        document.querySelectorAll('.project-card, .skill-card, .ai-service-card').forEach(el => {
-          observer.observe(el);
-        });
-      }
-
-      // Preload critical images on idle
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(() => {
-          const criticalImages = document.querySelectorAll('img[fetchpriority="high"]');
-          criticalImages.forEach(img => {
-            if (img.loading === 'lazy') {
-              img.loading = 'eager';
-            }
-          });
-        });
-      }
-
-      // Clean up will-change after animations complete
-      document.addEventListener('animationend', (e) => {
-        if (e.target.style.willChange) {
-          setTimeout(() => {
-            e.target.style.willChange = 'auto';
-          }, 100);
-        }
-      });
-    }
-  </script>
+<Layout>
+  <Nav />
+  <main>
+    <Hero />
+    <Work />
+    <About />
+    <GameTeaser />
+    <Testimonials />
+    <Repos />
+    <Contact />
+  </main>
 </Layout>

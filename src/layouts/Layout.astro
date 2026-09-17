@@ -1,66 +1,53 @@
 ---
 import '../styles/global.css';
-import PageLoader from '../components/PageLoader.astro';
 
+interface Props {
+  title?: string;
+  description?: string;
+  /** Chromeless pages (the game) skip the site nav and page padding. */
+  bare?: boolean;
+}
+
+const {
+  title = 'Brandon van Vuuren — Full-stack Developer & AI Engineer',
+  description = 'Brandon van Vuuren builds production systems across React, .NET, Python and AI. Selected work, live repositories, and a CV you can drive through.',
+  bare = false,
+} = Astro.props;
 ---
 
 <!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes, maximum-scale=5" />
-		<meta name="mobile-web-app-capable" content="yes" />
-		<meta name="apple-mobile-web-app-capable" content="yes" />
-		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-		<meta name="theme-color" content="#0f172a" />
-		<meta name="format-detection" content="telephone=no" />
-		
-		<!-- Performance: Resource Hints -->
-		<link rel="preload" href="/images/8k_stars_milky_way.webp" as="image" type="image/webp" />
-		<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-		<link rel="preconnect" href="https://cdn.simpleicons.org" crossorigin />
-		<link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
-		<link rel="dns-prefetch" href="https://cdn.simpleicons.org" />
-		
-		<!-- Performance: Reduce render-blocking -->
-		<style>
-			/* Critical CSS - Above the fold */
-			body{margin:0;background:linear-gradient(180deg, #1a1f2e 0%, #0f1419 25%, #0a0e1a 50%, #0f0f1f 75%, #0f172a 100%);color:#f1f5f9;font-family:system-ui,-apple-system,sans-serif;min-height:100vh}
-			*{box-sizing:border-box}
-		</style>
-		
-		<slot name="head" />
-	</head>
-	<body class="min-h-screen text-slate-100 relative overflow-x-hidden" style="background: linear-gradient(180deg, #1a1f2e 0%, #0f1419 25%, #0a0e1a 50%, #0f0f1f 75%, #0f172a 100%);">
-		<!-- Milky Way Stars Background -->
-		<div class="fixed inset-0 pointer-events-none z-0">
-			<img
-				src="/images/8k_stars_milky_way.webp"
-				alt=""
-				class="milky-way-bg w-full h-full object-cover"
-				loading="eager"
-				decoding="async"
-			/>
-		</div>
-		<style>
-			.milky-way-bg {
-				opacity: 0;
-				animation: fadeInBg 0.8s ease-out forwards;
-			}
-			@keyframes fadeInBg {
-				to { opacity: 0.28; }
-			}
-		</style>
-		<!-- Background accent elements -->
-		<div class="fixed inset-0 pointer-events-none overflow-hidden z-[1]">
-			<div class="absolute -top-40 -right-40 w-80 h-80 bg-blue-600/5 rounded-full blur-3xl"></div>
-			<div class="absolute bottom-0 left-0 w-96 h-96 bg-slate-700/3 rounded-full blur-3xl"></div>
-			<div class="absolute top-1/2 right-1/4 w-64 h-64 bg-slate-600/2 rounded-full blur-3xl"></div>
-		</div>
-		<PageLoader />
-		<div class="relative z-10">
-			<slot />
-		</div>
-		<script src="https://unpkg.com/@dotlottie/player-component"></script>
-	</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..800&display=swap"
+    />
+
+    <style is:inline>
+      /* Paint black before anything else loads — no white flash. */
+      html { background: #000; }
+      body { margin: 0; background: #000; color: #f5f5f7; }
+    </style>
+
+    <slot name="head" />
+  </head>
+
+  <body class={bare ? 'is-bare' : ''}>
+    <slot />
+    {!bare && <script>import '../scripts/motion.ts';</script>}
+  </body>
 </html>

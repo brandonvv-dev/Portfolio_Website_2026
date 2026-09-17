@@ -1,286 +1,149 @@
 ---
-// src/components/Contact.astro
+import CvGameButton from './CvGameButton.astro';
+
+const email = 'brandon.vanvuuren60@gmail.com';
+
+const channels = [
+  { label: 'Email', value: email, href: `mailto:${email}` },
+  { label: 'GitHub', value: 'Brandon255-rgb', href: 'https://github.com/Brandon255-rgb' },
+  { label: 'LinkedIn', value: 'brandon-van-vuuren', href: 'https://www.linkedin.com/in/brandon-van-vuuren-9616841b6' },
+];
 ---
 
-<section id="contact" class="py-32 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-  <!-- Background -->
-  <div class="absolute inset-0 bg-linear-to-b from-slate-900 via-slate-950 to-black"></div>
-  <div class="absolute inset-0">
-    <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full filter blur-3xl"></div>
-    <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full filter blur-3xl"></div>
-  </div>
-  
-  <div class="max-w-5xl mx-auto relative z-10">
-    <div class="text-center mb-16">
-      <div class="inline-block mb-4">
-        <span class="px-4 py-2 bg-linear-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-full text-blue-300 text-sm font-semibold backdrop-blur-sm">
-          Let's Connect
-        </span>
-      </div>
-      <h2 class="text-4xl sm:text-5xl md:text-6xl font-black text-white mb-6 tracking-tight">
-        Ready to <span class="bg-clip-text text-transparent font-extrabold" style="background-image: radial-gradient(circle, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);">Build?</span>
-      </h2>
-      <p class="text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed">
-        Available for freelance projects, consulting, or full-time opportunities.<br />
-        <span class="text-slate-300 font-semibold">Fast turnaround. Clean code. Real results.</span>
-      </p>
-    </div>
-    
-    <!-- Contact Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-16">
-      <a
-        href="mailto:brandon.vanvuuren60@gmail.com"
-        class="contact-card group"
-      >
-        <div class="contact-icon-wrapper bg-linear-to-br from-blue-500/20 to-cyan-500/20 border-blue-500/30">
-          <svg class="w-8 h-8 text-blue-400 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-          </svg>
-        </div>
-        <div class="mt-4">
-          <p class="text-lg font-bold text-white mb-1">Email</p>
-          <p class="text-sm text-slate-400">Quick response</p>
-        </div>
-        <div class="contact-card-glow"></div>
-      </a>
+<section id="contact" class="contact">
+  <div class="shell contact-inner">
+    <p class="t-eyebrow reveal">Contact</p>
 
-      <a
-        href="https://github.com/Brandon255-rgb"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="contact-card group"
-      >
-        <div class="contact-icon-wrapper bg-linear-to-br from-slate-500/20 to-slate-700/20 border-slate-500/30">
-          <svg class="w-8 h-8 text-slate-300 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-          </svg>
-        </div>
-        <div class="mt-4">
-          <p class="text-lg font-bold text-white mb-1">GitHub</p>
-          <p class="text-sm text-slate-400">View code</p>
-        </div>
-        <div class="contact-card-glow"></div>
-      </a>
+    <h2 class="t-headline t-shine reveal" style="--d:80ms">
+      Got something that<br />needs building?
+    </h2>
 
-      <a
-        href="https://www.linkedin.com/in/brandon-van-vuuren-9616841b6"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="contact-card group"
-      >
-        <div class="contact-icon-wrapper bg-linear-to-br from-blue-600/20 to-blue-800/20 border-blue-600/30">
-          <svg class="w-8 h-8 text-blue-400 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-          </svg>
-        </div>
-        <div class="mt-4">
-          <p class="text-lg font-bold text-white mb-1">LinkedIn</p>
-          <p class="text-sm text-slate-400">Connect</p>
-        </div>
-        <div class="contact-card-glow"></div>
-      </a>
+    <p class="t-lede contact-lede reveal" style="--d:160ms">
+      Fast turnaround, clean code, and a straight answer about what it&rsquo;ll take.
+    </p>
+
+    <div class="contact-actions reveal" style="--d:240ms">
+      <a class="btn btn-primary" href={`mailto:${email}`}>Start a conversation</a>
+      <CvGameButton size="md" />
     </div>
-    
-    <!-- Info Grid -->
-    <div class="info-grid">
-      <div class="info-card">
-        <div class="info-icon">
-          <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-          </svg>
-        </div>
-        <div>
-          <p class="info-label">Response Time</p>
-          <p class="info-value">< 24 hours</p>
-        </div>
-      </div>
-      
-      <div class="info-card">
-        <div class="info-icon">
-          <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-        </div>
-        <div>
-          <p class="info-label">Availability</p>
-          <p class="info-value">Open to projects</p>
-        </div>
-      </div>
-      
-      <div class="info-card">
-        <div class="info-icon">
-          <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-        </div>
-        <div>
-          <p class="info-label">Time Zone</p>
-          <p class="info-value">SAST (UTC+2)</p>
-        </div>
-      </div>
-    </div>
-    
-    <!-- CTA -->
-    <div class="text-center mt-16">
-      <p class="text-lg text-slate-400 mb-6">
-        Prefer to send a message directly?
-      </p>
-      <a 
-        href="mailto:brandon.vanvuuren60@gmail.com"
-        class="inline-flex items-center gap-3 px-8 py-4 bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl font-semibold transition-shadow duration-200 shadow-sm shadow-blue-500/9 hover:shadow-blue-500/18 border border-white"
-      >
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-        </svg>
-        <span>Send an Email</span>
-      </a>
-    </div>
+
+    <ul class="channels">
+      {
+        channels.map((c, i) => (
+          <li class="reveal" style={`--d:${300 + i * 80}ms`}>
+            <a href={c.href} target={c.href.startsWith('mailto') ? undefined : '_blank'} rel="noopener">
+              <span class="channel-label">{c.label}</span>
+              <span class="channel-value">{c.value}</span>
+              <span class="channel-arrow" aria-hidden="true">›</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
   </div>
+
+  <footer class="foot">
+    <div class="shell foot-inner">
+      <p>© {new Date().getFullYear()} Brandon van Vuuren</p>
+      <p><a href="/drive">Drive the CV</a> · <a href="/assets/CV Brandon van Vuuren.pdf" target="_blank" rel="noopener">PDF version</a></p>
+    </div>
+  </footer>
 </section>
 
-<!-- Footer -->
-<footer class="py-12 px-4 bg-black/50 border-t border-slate-900 relative overflow-hidden">
-  <div class="absolute inset-0 opacity-30">
-    <div class="absolute top-0 left-1/4 w-64 h-64 bg-blue-500/10 rounded-full filter blur-3xl"></div>
-  </div>
-  
-  <div class="max-w-7xl mx-auto relative z-10">
-    <div class="flex flex-col md:flex-row items-center justify-between gap-6">
-      <div class="text-center md:text-left">
-        <p class="text-slate-400 text-sm mb-2">
-          © {new Date().getFullYear()} Brandon. All rights reserved.
-        </p>
-        <p class="text-slate-600 text-xs">
-          Built with Astro • Deployed on Vercel • Zero bloat, maximum speed
-        </p>
-      </div>
-      
-      <div class="flex items-center gap-6">
-        <a href="#" class="text-slate-500 hover:text-slate-300 transition-colors text-sm">Privacy</a>
-        <a href="#" class="text-slate-500 hover:text-slate-300 transition-colors text-sm">Terms</a>
-        <button 
-          onclick="window.scrollTo({top: 0, behavior: 'smooth'})"
-          class="flex items-center gap-2 text-slate-500 hover:text-white transition-colors text-sm group"
-        >
-          <span>Back to top</span>
-          <svg class="w-4 h-4 group-hover:-translate-y-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </div>
-</footer>
-
 <style>
-  .contact-card {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 2.5rem 1.5rem;
-    background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8));
-    backdrop-filter: blur(20px);
-    border-radius: 1.5rem;
-    border: 1px solid rgba(100, 116, 139, 0.2);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden;
-  }
-  
-  .contact-card:hover {
-    transform: translateY(-8px);
-    border-color: rgba(100, 116, 139, 0.4);
-  }
-  
-  .contact-card-glow {
-    position: absolute;
-    inset: 0;
-    /* much more subtle blue glow */
-    background: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.04), transparent 65%);
-    opacity: 0;
-    transition: opacity 0.25s ease, filter 0.25s ease;
-    filter: blur(14px);
+  .contact {
+    border-top: 1px solid var(--hairline);
+    background:
+      radial-gradient(60% 60% at 50% 0%, rgba(41, 151, 255, 0.14), transparent 70%),
+      var(--bg);
   }
 
-  .contact-card:hover .contact-card-glow {
-    opacity: 0.2; /* minimal visible glow on hover - 20% less */
-  }
-  
-  .contact-icon-wrapper {
-    width: 80px;
-    height: 80px;
-    border-radius: 1.25rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-width: 1px;
-    transition: all 0.4s ease;
-  }
-  
-  .contact-card:hover .contact-icon-wrapper {
-    transform: scale(1.1) rotate(5deg);
-  }
-  
-  .info-grid {
+  .contact-inner {
+    padding-block: clamp(5rem, 12vw, 9rem) clamp(4rem, 8vw, 6rem);
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
+    gap: 1.1rem;
+    justify-items: center;
+    text-align: center;
   }
-  
-  .info-card {
+  .contact-inner h2 {
+    margin: 0;
+  }
+  .contact-lede {
+    margin: 0;
+    max-width: 46ch;
+  }
+
+  .contact-actions {
     display: flex;
-    align-items: center;
-    gap: 1.5rem;
-    padding: 2rem;
-    background: linear-gradient(145deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.6));
-    backdrop-filter: blur(16px);
-    border-radius: 1.25rem;
-    border: 1px solid rgba(100, 116, 139, 0.2);
-    transition: all 0.3s ease;
-  }
-  
-  .info-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(100, 116, 139, 0.4);
-  }
-  
-  .info-icon {
-    flex-shrink: 0;
-    width: 56px;
-    height: 56px;
-    display: flex;
-    align-items: center;
+    flex-wrap: wrap;
     justify-content: center;
-    background: rgba(15, 23, 42, 0.8);
-    border-radius: 1rem;
-    border: 1px solid rgba(100, 116, 139, 0.2);
+    align-items: center;
+    gap: 0.85rem;
+    margin-top: 0.75rem;
   }
-  
-  .info-label {
-    font-size: 0.875rem;
-    color: #94a3b8;
+
+  .channels {
+    list-style: none;
+    margin: clamp(2.5rem, 6vw, 4rem) 0 0;
+    padding: 0;
+    width: min(100%, 620px);
+    text-align: left;
+  }
+  .channels li:first-child a {
+    border-top: 1px solid var(--hairline);
+  }
+  .channels a {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.15rem 0.25rem;
+    border-bottom: 1px solid var(--hairline);
+    text-decoration: none;
+    color: var(--text);
+    transition: padding-inline 0.3s var(--ease), color 0.3s var(--ease);
+  }
+  .channels a:hover {
+    padding-inline: 0.75rem 0;
+    color: var(--accent);
+  }
+  .channel-label {
+    font-size: 0.8125rem;
+    color: var(--text-dim);
+    width: 5.5rem;
+    flex: 0 0 auto;
+  }
+  .channel-value {
+    font-size: 1rem;
     font-weight: 500;
-    margin-bottom: 0.25rem;
+    letter-spacing: -0.012em;
+    word-break: break-all;
   }
-  
-  .info-value {
-    font-size: 1.125rem;
-    color: #f1f5f9;
-    font-weight: 700;
+  .channel-arrow {
+    margin-left: auto;
+    color: var(--text-dim);
+    font-size: 1.25rem;
   }
-  
-  @media (max-width: 640px) {
-    .contact-card {
-      padding: 2rem 1rem;
-    }
-    
-    .contact-icon-wrapper {
-      width: 64px;
-      height: 64px;
-    }
-    
-    .info-grid {
-      grid-template-columns: 1fr;
-    }
+
+  .foot {
+    border-top: 1px solid var(--hairline);
+    padding-block: 1.75rem;
+  }
+  .foot-inner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+  .foot-inner p {
+    margin: 0;
+  }
+  .foot-inner a {
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .foot-inner a:hover {
+    color: var(--accent);
   }
 </style>
