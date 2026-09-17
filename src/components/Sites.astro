@@ -1,5 +1,6 @@
 ---
 import { sites } from '../data/sites';
+import { siteLinks } from '../data/site-links';
 
 const total = sites.reduce((n, s) => n + s.images.length, 0);
 ---
@@ -31,6 +32,7 @@ const total = sites.reduce((n, s) => n + s.images.length, 0);
               data-site={s.slug}
               data-name={s.name}
               data-images={JSON.stringify(s.images)}
+              data-url={siteLinks[s.slug] ?? ''}
             >
               <span class="num">{String(s.num).padStart(2, '0')}</span>
               <img src={s.card} alt={`${s.name} website`} loading="lazy" decoding="async" width="900" height="563" />
@@ -48,23 +50,48 @@ const total = sites.reduce((n, s) => n + s.images.length, 0);
 
 <dialog class="lightbox" data-lightbox>
   <header>
-    <h3 data-lb-title></h3>
+    <div>
+      <h3 data-lb-title></h3>
+      <p data-lb-count></p>
+    </div>
+    <a class="lb-live" data-lb-live target="_blank" rel="noopener" hidden>Visit the site &rsaquo;</a>
     <button type="button" data-lb-close aria-label="Close">&times;</button>
   </header>
-  <div class="rail" data-lb-rail></div>
+
+  <!-- Vertical, page after page: reads like scrolling the site itself -->
+  <div class="pages" data-lb-pages></div>
+
+  <footer>
+    <span>Built by <a href="https://axiom-billing.vercel.app/" target="_blank" rel="noopener">Axiom</a></span>
+    <a data-lb-foot-live target="_blank" rel="noopener" hidden>Visit the site &rsaquo;</a>
+    <a href="mailto:brandon.vanvuuren60@gmail.com">Want one like this? &rsaquo;</a>
+  </footer>
 </dialog>
 
 <script>
   const dialog = document.querySelector<HTMLDialogElement>('[data-lightbox]');
-  const rail = document.querySelector<HTMLElement>('[data-lb-rail]');
+  const pages = document.querySelector<HTMLElement>('[data-lb-pages]');
   const title = document.querySelector<HTMLElement>('[data-lb-title]');
+  const count = document.querySelector<HTMLElement>('[data-lb-count]');
+  const live = document.querySelector<HTMLAnchorElement>('[data-lb-live]');
+  const footLive = document.querySelector<HTMLAnchorElement>('[data-lb-foot-live]');
 
-  if (dialog && rail && title) {
+  if (dialog && pages && title && count) {
     const open = (btn: HTMLElement) => {
       const images: string[] = JSON.parse(btn.dataset.images ?? '[]');
+      const url = btn.dataset.url ?? '';
+
       title.textContent = btn.dataset.name ?? '';
+      count.textContent = `${images.length} screens`;
+
+      for (const a of [live, footLive]) {
+        if (!a) continue;
+        a.hidden = !url;
+        if (url) a.href = url;
+      }
+
       // Built on open, not on page load: 189 screenshots is not a page weight.
-      rail.replaceChildren(
+      pages.replaceChildren(
         ...images.map((src, i) => {
           const img = document.createElement('img');
           img.src = src;
@@ -74,7 +101,7 @@ const total = sites.reduce((n, s) => n + s.images.length, 0);
           return img;
         })
       );
-      rail.scrollLeft = 0;
+      pages.scrollTop = 0;
       dialog.showModal();
     };
 
@@ -90,7 +117,7 @@ const total = sites.reduce((n, s) => n + s.images.length, 0);
     });
 
     // Free the images again so a long session doesn't hoard decoded bitmaps.
-    dialog.addEventListener('close', () => rail.replaceChildren());
+    dialog.addEventListener('close', () => pages.replaceChildren());
 
     // The game links back here as /#site-<slug>, so open that one on arrival.
     const fromHash = () => {
@@ -209,9 +236,10 @@ const total = sites.reduce((n, s) => n + s.images.length, 0);
 
   /* --- Lightbox --------------------------------------------------------- */
   .lightbox {
-    width: min(1180px, 94vw);
+    width: min(1040px, 94vw);
+    height: min(92vh, 1100px);
     max-width: none;
-    max-height: 90vh;
+    max-height: 92vh;
     padding: 0;
     border: 1px solid var(--hairline-strong);
     border-radius: 20px;
@@ -219,18 +247,27 @@ const total = sites.reduce((n, s) => n + s.images.length, 0);
     color: var(--text);
     overflow: hidden;
   }
+  /* Header, scrolling pages, footer. Only a grid once open, or [open] is
+     fought by the dialog's own display:none. */
+  .lightbox[open] {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
   .lightbox::backdrop {
-    background: rgba(0, 0, 0, 0.78);
+    background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(6px);
   }
 
   .lightbox header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 1rem;
-    padding: 1rem 1.25rem;
+    padding: 0.9rem 1.25rem;
     border-bottom: 1px solid var(--hairline);
+  }
+  .lightbox header > div {
+    margin-right: auto;
+    min-width: 0;
   }
   .lightbox h3 {
     margin: 0;
@@ -238,12 +275,28 @@ const total = sites.reduce((n, s) => n + s.images.length, 0);
     font-weight: 600;
     letter-spacing: -0.015em;
   }
+  .lightbox header p {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+  .lb-live {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--accent);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .lb-live[hidden] {
+    display: none;
+  }
   .lightbox header button {
     font: inherit;
     font-size: 1.5rem;
     line-height: 1;
     width: 36px;
     height: 36px;
+    flex: 0 0 auto;
     border-radius: 50%;
     border: 1px solid var(--hairline);
     background: transparent;
@@ -255,17 +308,46 @@ const total = sites.reduce((n, s) => n + s.images.length, 0);
     border-color: var(--hairline-strong);
   }
 
-  .lightbox .rail {
-    padding: 1.25rem;
-    --gutter: 1.25rem;
+  /* Screens stacked top to bottom, so scrolling reads like the site itself */
+  .pages {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: grid;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: #08080a;
+    scrollbar-width: thin;
   }
-  .lightbox .rail img {
-    flex: 0 0 auto;
-    width: min(86vw, 900px);
-    border-radius: 10px;
+  .pages img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
     border: 1px solid var(--hairline);
-    scroll-snap-align: center;
+    background: var(--surface);
   }
+
+  .lightbox footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.25rem;
+    padding: 0.85rem 1.25rem;
+    border-top: 1px solid var(--hairline);
+    font-size: 0.8125rem;
+    color: var(--text-dim);
+  }
+  .lightbox footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .lightbox footer a[hidden] {
+    display: none;
+  }
+  .lightbox footer > :last-child {
+    margin-left: auto;
+  }
+
 
   @media (min-width: 900px) {
     .sites-head {

@@ -203,8 +203,16 @@ export function buildWorld(
     mesh.receiveShadow = true;
     scene.add(mesh);
 
-    const body = new CANNON.Body({ mass, shape, material: groundMaterial });
-    body.position.set(rest[0], rest[1] + DROP, rest[2]);
+    // Positioned at construction, like the static bodies: a body parked asleep
+    // never integrates, so it would keep the origin-centred AABB it was built
+    // with right up until something woke it.
+    const body = new CANNON.Body({
+      mass,
+      shape,
+      material: groundMaterial,
+      position: new CANNON.Vec3(rest[0], rest[1] + DROP, rest[2]),
+    });
+    body.updateAABB();
     body.allowSleep = true;
     body.sleep();
     world.addBody(body);
@@ -219,13 +227,25 @@ export function buildWorld(
     });
   };
 
+  /**
+   * Static bodies must be told where they are *before* their bounding box is
+   * worked out. Constructing one and then moving it leaves the AABB sitting at
+   * the origin with `aabbNeedsUpdate` already cleared, so the broadphase never
+   * returns it — the body is solid in principle and transparent in practice,
+   * and the car drives straight through it.
+   */
   const addStatic = (mesh: THREE.Mesh, shape: CANNON.Shape, quat?: CANNON.Quaternion) => {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     scene.add(mesh);
-    const body = new CANNON.Body({ mass: 0, shape, material: groundMaterial });
-    body.position.set(mesh.position.x, mesh.position.y, mesh.position.z);
-    if (quat) body.quaternion.copy(quat);
+    const body = new CANNON.Body({
+      mass: 0,
+      shape,
+      material: groundMaterial,
+      position: new CANNON.Vec3(mesh.position.x, mesh.position.y, mesh.position.z),
+      quaternion: quat,
+    });
+    body.updateAABB();
     world.addBody(body);
   };
 
@@ -335,13 +355,16 @@ export function buildWorld(
     mesh.receiveShadow = true;
     scene.add(mesh);
 
+    const quat = new CANNON.Quaternion();
+    quat.setFromEuler(0, yaw, 0);
     const body = new CANNON.Body({
       mass: 0,
       shape: new CANNON.Box(new CANNON.Vec3(half, 1.5, 0.5)),
       material: groundMaterial,
+      position: new CANNON.Vec3(x, 1.5, z),
+      quaternion: quat,
     });
-    body.position.set(x, 1.5, z);
-    body.quaternion.setFromEuler(0, yaw, 0);
+    body.updateAABB();
     world.addBody(body);
     blockers.push(mesh);
   };
@@ -617,13 +640,17 @@ export function buildWorld(
     }
   }
 
-  // A ramp, because everyone tries to jump something. You approach from +Z,
-  // so it has to *rise* towards -Z: tilted the other way its leading edge is
-  // a three-metre wall you simply crash into. Positioned so that edge sits on
-  // the floor, which is what makes it rideable rather than a kerb.
+  // A ramp, because everyone tries to jump something. Two things have to be
+  // right or it is just a wall:
+  //
+  //   1. It rises towards -Z, because that is the way you approach it.
+  //   2. Its *top* face meets the floor at the leading edge. Line the bottom
+  //      edge up instead and the surface you actually drive on still starts
+  //      0.8m in the air, which a 0.36m wheel cannot climb. The nose of the
+  //      wedge ends up buried, which is exactly how a ramp should sit.
   const RAMP = { tilt: 0.16, halfZ: 9, halfY: 0.4 };
   const rampY =
-    RAMP.halfY * Math.cos(RAMP.tilt) + RAMP.halfZ * Math.sin(RAMP.tilt) + 0.02;
+    0.02 - (RAMP.halfY * Math.cos(RAMP.tilt) - RAMP.halfZ * Math.sin(RAMP.tilt));
 
   const rampQuat = new CANNON.Quaternion();
   rampQuat.setFromEuler(RAMP.tilt, 0, 0);

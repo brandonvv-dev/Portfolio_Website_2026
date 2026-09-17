@@ -8,11 +8,18 @@ export interface CarInput {
   /** -1 (right) .. 1 (left) */
   steer: number;
   brake: boolean;
+  /** Rear-axle lock. Optional so the plain keyboard input still satisfies this. */
+  handbrake?: boolean;
 }
 
 const MAX_FORCE = 1500;
 const MAX_STEER = 0.52;
 const BRAKE_FORCE = 30;
+/**
+ * Handbrake: locks the rear pair only, which is what lets the back step out.
+ * Full-axle braking just stops the car in a straight line.
+ */
+const HANDBRAKE_FORCE = 110;
 /** Speed limiter (km/h). Uncapped this thing reaches 150+ and is undriveable. */
 const MAX_KMH = 78;
 /** Every model is rescaled to this nose-to-tail length, so swaps stay drivable. */

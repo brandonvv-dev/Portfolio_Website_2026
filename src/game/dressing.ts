@@ -81,26 +81,206 @@ function mulberry32(seed: number) {
 
 /* ---------------------------------------------------------------- signs */
 
-function signTexture(title: string, sub: string, accent: string) {
+/**
+ * Hoardings come in several designs. One house style repeated a dozen times
+ * down the same road reads as wallpaper; mixing them makes the roadside look
+ * like somewhere that actually sells advertising space.
+ */
+export type SignStyle = 'plate' | 'neon' | 'paper' | 'blueprint' | 'terminal' | 'sticker';
+
+/**
+ * Extra yaw applied to the television model so its screen faces the way it is
+ * placed. Measured by looking at it, not derivable from the GLB.
+ */
+const TV_FACE_YAW = 0;
+
+const SIGN_STYLES: SignStyle[] = [
+  'plate',
+  'neon',
+  'paper',
+  'blueprint',
+  'terminal',
+  'sticker',
+];
+
+function signTexture(title: string, sub: string, accent: string, style: SignStyle = 'plate') {
   const c = document.createElement('canvas');
   c.width = 1024;
   c.height = 384;
   const ctx = c.getContext('2d')!;
-
-  ctx.fillStyle = '#0e1116';
-  ctx.fillRect(0, 0, c.width, c.height);
-  ctx.fillStyle = accent;
-  ctx.fillRect(0, 0, c.width, 14);
-  ctx.fillRect(0, c.height - 14, c.width, 14);
-
+  const W = c.width;
+  const H = c.height;
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '800 108px Inter, system-ui, sans-serif';
-  ctx.fillText(title, c.width / 2, 178, c.width - 90);
 
-  ctx.fillStyle = accent;
-  ctx.font = '600 58px Inter, system-ui, sans-serif';
-  ctx.fillText(sub, c.width / 2, 268, c.width - 90);
+  const MONO = 'ui-monospace, Menlo, Consolas, monospace';
+  const SANS = 'Inter, system-ui, sans-serif';
+
+  const heading = (size: number, color: string, y: number, font = SANS) => {
+    ctx.fillStyle = color;
+    ctx.font = '800 ' + size + 'px ' + font;
+    ctx.fillText(title, W / 2, y, W - 100);
+  };
+  const strap = (size: number, color: string, y: number, font = SANS) => {
+    ctx.fillStyle = color;
+    ctx.font = '600 ' + size + 'px ' + font;
+    ctx.fillText(sub, W / 2, y, W - 100);
+  };
+
+  switch (style) {
+    case 'neon': {
+      ctx.fillStyle = '#05060a';
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 8;
+      ctx.shadowColor = accent;
+      ctx.shadowBlur = 34;
+      ctx.strokeRect(24, 24, W - 48, H - 48);
+      heading(104, '#ffffff', 186);
+      ctx.shadowBlur = 18;
+      strap(54, accent, 268);
+      ctx.shadowBlur = 0;
+      break;
+    }
+
+    case 'paper': {
+      ctx.fillStyle = '#f4f1ea';
+      ctx.fillRect(0, 0, W, H);
+      heading(104, '#14161a', 172);
+      ctx.fillStyle = accent;
+      ctx.fillRect(W / 2 - 70, 204, 140, 6);
+      strap(50, '#5a5f68', 284);
+      break;
+    }
+
+    case 'blueprint': {
+      ctx.fillStyle = '#0b2a4a';
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(255,255,255,0.13)';
+      ctx.lineWidth = 2;
+      for (let x = 0; x < W; x += 48) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, H);
+        ctx.stroke();
+      }
+      for (let y = 0; y < H; y += 48) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(W, y);
+        ctx.stroke();
+      }
+      heading(96, '#eaf3ff', 178);
+      strap(48, '#8ec5ff', 264);
+      break;
+    }
+
+    case 'terminal': {
+      ctx.fillStyle = '#0a0d0b';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#1d241f';
+      ctx.fillRect(0, 0, W, 62);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#4ade80';
+      ctx.font = '700 40px ' + MONO;
+      ctx.fillText('~ $ whoami', 40, 44, W - 80);
+      ctx.font = '700 82px ' + MONO;
+      ctx.fillText(title, 40, 196, W - 80);
+      ctx.fillStyle = '#9aa5b1';
+      ctx.font = '500 44px ' + MONO;
+      ctx.fillText(sub, 40, 272, W - 80);
+      ctx.fillStyle = '#4ade80';
+      ctx.fillRect(40, 304, 26, 44);
+      ctx.textAlign = 'center';
+      break;
+    }
+
+    case 'sticker': {
+      ctx.fillStyle = accent;
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+      ctx.lineWidth = 10;
+      ctx.setLineDash([26, 18]);
+      ctx.strokeRect(22, 22, W - 44, H - 44);
+      ctx.setLineDash([]);
+      heading(112, '#0b0d10', 188);
+      strap(52, 'rgba(11,13,16,0.75)', 272);
+      break;
+    }
+
+    default: {
+      ctx.fillStyle = '#0e1116';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = accent;
+      ctx.fillRect(0, 0, W, 14);
+      ctx.fillRect(0, H - 14, W, 14);
+      heading(108, '#ffffff', 178);
+      strap(58, accent, 268);
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+/* ------------------------------------------------------------ the stack */
+
+/** The tools, as blocks you can drive into. */
+const STACK: [string, string][] = [
+  ['C#', '#8b2be2'],
+  ['.NET', '#512bd4'],
+  ['React', '#61dafb'],
+  ['Node.js', '#5fa04e'],
+  ['JavaScript', '#f7df1e'],
+  ['TypeScript', '#3178c6'],
+  ['Python', '#3776ab'],
+  ['C++', '#00599c'],
+  ['Astro', '#ff5d01'],
+  ['Next.js', '#d8dbe0'],
+  ['PostgreSQL', '#4169e1'],
+  ['Docker', '#2496ed'],
+  ['Kafka', '#7c8694'],
+  ['PyTorch', '#ee4c2c'],
+  ['Tailwind', '#06b6d4'],
+  ['Redis', '#dc382d'],
+  ['FastAPI', '#009688'],
+  ['three.js', '#c9ced6'],
+  ['Git', '#f05032'],
+  ['SQL', '#e38c00'],
+];
+
+/** Dark ink on light blocks, light on dark: the label has to survive either. */
+function inkFor(hex: string) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? '#0b0d10' : '#ffffff';
+}
+
+function stackTexture(name: string, color: string) {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 512;
+  const ctx = c.getContext('2d')!;
+  const ink = inkFor(color);
+
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, 512, 512);
+
+  ctx.strokeStyle = ink;
+  ctx.globalAlpha = 0.25;
+  ctx.lineWidth = 10;
+  ctx.strokeRect(26, 26, 460, 460);
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = ink;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const size = name.length > 8 ? 74 : name.length > 4 ? 100 : 148;
+  ctx.font = '800 ' + size + 'px Inter, system-ui, sans-serif';
+  ctx.fillText(name, 256, 256, 430);
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -119,9 +299,15 @@ export function dressWorld(ctx: DressContext): Dressing {
   });
   const backMat = new THREE.MeshStandardMaterial({ color: 0x3c424e, roughness: 0.85 });
 
+  /** Positioned at construction: see the note on addStatic in world.ts. */
   const staticBody = (shape: CANNON.Shape, x: number, y: number, z: number) => {
-    const body = new CANNON.Body({ mass: 0, shape, material: groundMaterial });
-    body.position.set(x, y, z);
+    const body = new CANNON.Body({
+      mass: 0,
+      shape,
+      material: groundMaterial,
+      position: new CANNON.Vec3(x, y, z),
+    });
+    body.updateAABB();
     world.addBody(body);
   };
 
@@ -135,7 +321,8 @@ export function dressWorld(ctx: DressContext): Dressing {
     z: number,
     yaw: number,
     accent = '#2997ff',
-    width = 13
+    width = 13,
+    style: SignStyle = 'plate'
   ) => {
     const h = width * 0.375;
     const group = new THREE.Group();
@@ -145,7 +332,7 @@ export function dressWorld(ctx: DressContext): Dressing {
     const face = new THREE.Mesh(
       new THREE.PlaneGeometry(width, h),
       new THREE.MeshStandardMaterial({
-        map: signTexture(title, sub, accent),
+        map: signTexture(title, sub, accent, style),
         roughness: 0.65,
         side: THREE.DoubleSide,
       })
@@ -200,7 +387,9 @@ export function dressWorld(ctx: DressContext): Dressing {
 
   lanes.forEach(([x, z, yaw], i) => {
     const [title, sub] = pitches[i % pitches.length];
-    hoarding(title, sub, x, z, yaw);
+    // Step the style by a number coprime with the list length, so neighbours
+    // never repeat a design even where the pitches wrap around.
+    hoarding(title, sub, x, z, yaw, '#2997ff', 13, SIGN_STYLES[(i * 5) % SIGN_STYLES.length]);
   });
 
   /* ---------------------------------------------------------- link pads */
@@ -267,7 +456,6 @@ export function dressWorld(ctx: DressContext): Dressing {
   };
 
   const axiom = ventures.find((v) => v.id === 'axiom')!;
-  const drive = ventures.find((v) => v.id === 'drive')!;
   const linkedin = profiles.find((p) => p.id === 'linkedin')!;
   const github = profiles.find((p) => p.id === 'github')!;
   const email = profiles.find((p) => p.id === 'email')!;
@@ -341,23 +529,8 @@ export function dressWorld(ctx: DressContext): Dressing {
     Math.PI / 2
   );
 
-  linkPad(
-    {
-      id: 'drive',
-      title: drive.name,
-      sub: drive.tagline,
-      body: drive.blurb,
-      url: '/',
-      cta: 'Back to the site',
-      external: false,
-      accent: drive.accent,
-      tags: drive.tags,
-    },
-    0,
-    -118,
-    0,
-    { w: 18, d: 12 }
-  );
+  // No pad for Drive My CV: parked on the run-in to the finish, its hoarding
+  // stood directly in front of the CV podium. It lives on the site instead.
 
   /* ------------------------------------------------- the Axiom big screen */
 
@@ -384,10 +557,11 @@ export function dressWorld(ctx: DressContext): Dressing {
   const videoTex = new THREE.VideoTexture(video);
   videoTex.colorSpace = THREE.SRGBColorSpace;
 
-  const SCREEN_W = 24;
+  // Big enough to read from the far end of the avenue.
+  const SCREEN_W = 40;
   const SCREEN_H = SCREEN_W * 0.5625;
   const screenGroup = new THREE.Group();
-  screenGroup.position.set(-70, 0, 84);
+  screenGroup.position.set(-78, 0, 84);
   screenGroup.rotation.y = Math.PI / 2; // faces the avenue
 
   const screen = new THREE.Mesh(
@@ -402,38 +576,60 @@ export function dressWorld(ctx: DressContext): Dressing {
       roughness: 0.4,
     })
   );
-  screen.position.y = 5 + SCREEN_H / 2;
+  screen.position.y = 6 + SCREEN_H / 2;
   screenGroup.add(screen);
 
   const bezel = new THREE.Mesh(
     new THREE.BoxGeometry(SCREEN_W + 1.6, SCREEN_H + 1.6, 0.8),
     new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: 0.7 })
   );
-  bezel.position.set(0, 5 + SCREEN_H / 2, -0.45);
+  bezel.position.set(0, 6 + SCREEN_H / 2, -0.45);
   bezel.castShadow = true;
   screenGroup.add(bezel);
   blockers.push(bezel);
 
   for (const end of [-1, 1]) {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 5.4, 12), postMat);
-    leg.position.set(end * (SCREEN_W / 2 - 2), 2.7, -0.45);
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 6.4, 12), postMat);
+    leg.position.set(end * (SCREEN_W / 2 - 3), 3.2, -0.45);
     leg.castShadow = true;
     screenGroup.add(leg);
-    staticBody(new CANNON.Cylinder(0.5, 0.6, 5.4, 10), -70, 2.7, 84 - end * (SCREEN_W / 2 - 2));
+    staticBody(new CANNON.Cylinder(0.6, 0.8, 6.4, 10), -78, 3.2, 84 - end * (SCREEN_W / 2 - 3));
   }
 
   const crown = new THREE.Mesh(
-    new THREE.PlaneGeometry(SCREEN_W, 2.4),
+    new THREE.PlaneGeometry(SCREEN_W, 3.6),
     new THREE.MeshStandardMaterial({
       map: signTexture('AXIOM', 'axiom-billing.vercel.app', axiom.accent),
       side: THREE.DoubleSide,
       roughness: 0.6,
     })
   );
-  crown.position.y = 5 + SCREEN_H + 2;
+  crown.position.y = 6 + SCREEN_H + 2.8;
   screenGroup.add(crown);
 
   scene.add(screenGroup);
+
+  /** A cube carrying one tool's name on all four sides. */
+  const stackBlock = (name: string, color: string, size: number) => {
+    const face = new THREE.MeshStandardMaterial({
+      map: stackTexture(name, color),
+      roughness: 0.45,
+      metalness: 0.12,
+    });
+    const edge = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(color),
+      roughness: 0.55,
+    });
+    // BoxGeometry material order: +X, -X, +Y, -Y, +Z, -Z
+    return new THREE.Mesh(new THREE.BoxGeometry(size, size, size), [
+      face,
+      face,
+      edge,
+      edge,
+      face,
+      face,
+    ]);
+  };
 
   /* --------------------------------------------------------- the scenery */
 
@@ -455,7 +651,15 @@ export function dressWorld(ctx: DressContext): Dressing {
   /** Scatters n props across the arena, skipping the no-go areas. */
   const scatter = (
     n: number,
-    pick: () => { name: string; height: number; collide: boolean; mass?: number }
+    pick: () => {
+      name: string;
+      height: number;
+      collide: boolean;
+      mass?: number;
+      /** Build a labelled cube rather than pull a model from the library. */
+      stack?: boolean;
+      color?: string;
+    }
   ) => {
     let placed = 0;
     let guard = 0;
@@ -466,12 +670,21 @@ export function dressWorld(ctx: DressContext): Dressing {
       const z = -20 + (rand() * 2 - 1) * 142;
       if (blocked(x, z)) continue;
 
-      const { name, height, collide, mass } = pick();
-      const mesh = lib.make(name, height);
-      mesh.position.set(x, 0, z);
+      const { name, height, collide, mass, stack, color } = pick();
+      const mesh = stack
+        ? stackBlock(name, color ?? '#2997ff', height)
+        : lib.make(name, height);
+      mesh.position.set(x, stack ? height / 2 : 0, z);
       mesh.rotation.y = rand() * Math.PI * 2;
 
-      if (mass) {
+      if (stack) {
+        addProp(
+          mesh,
+          new CANNON.Box(new CANNON.Vec3(height / 2, height / 2, height / 2)),
+          [x, height / 2, z],
+          mass ?? 4
+        );
+      } else if (mass) {
         const r = Math.max(0.35, lib.radius(name, height) * 0.8);
         addProp(mesh, new CANNON.Cylinder(r, r, height, 8), [x, height / 2, z], mass);
       } else {
@@ -534,19 +747,65 @@ export function dressWorld(ctx: DressContext): Dressing {
     mass: 1.1,
   }));
 
-  // A few televisions out in the world, because why not
+  // Televisions out in the world, each playing the same reel. The model's own
+  // screen is part of a baked colour atlas and cannot be addressed, so a video
+  // plane is fitted to the front of its measured bounding box instead.
   for (const [tx, tz, ty] of [
-    [-64, 62, Math.PI / 2],
-    [-64, 106, Math.PI / 2],
-    [62, 60, -Math.PI / 2],
+    [-64, 58, Math.PI / 2],
+    [-58, 108, Math.PI / 2],
+    [64, 58, -Math.PI / 2],
+    [30, -104, 0],
   ] as const) {
-    const tv = lib.make('televisionModern', 5.5);
+    const TV_H = 9;
+    const tv = lib.make('televisionModern', TV_H);
     tv.position.set(tx, 0, tz);
-    tv.rotation.y = ty;
+    tv.rotation.y = ty + TV_FACE_YAW;
     scene.add(tv);
-    staticBody(new CANNON.Box(new CANNON.Vec3(2.4, 2.75, 1)), tx, 2.75, tz);
+
+    const box = new THREE.Box3().setFromObject(tv);
+    const size = box.getSize(new THREE.Vector3());
+    const panel = new THREE.Mesh(
+      new THREE.PlaneGeometry(TV_H * 1.28, TV_H * 0.72),
+      new THREE.MeshStandardMaterial({
+        map: videoTex,
+        emissive: 0xffffff,
+        emissiveMap: videoTex,
+        emissiveIntensity: 1.05,
+        roughness: 0.35,
+      })
+    );
+    panel.position.set(tx, TV_H * 0.56, tz);
+    panel.rotation.y = ty;
+    panel.translateZ(Math.max(size.x, size.z) / 2 + 0.06);
+    scene.add(panel);
+
+    staticBody(new CANNON.Box(new CANNON.Vec3(3.4, TV_H / 2, 1.6)), tx, TV_H / 2, tz);
     count++;
   }
+
+  /* ------------------------------------------------------- the stack yard */
+
+  // A gauntlet down the east spur: every tool, in two staggered rows, right on
+  // the road out to the courtyard. You cannot take that route without
+  // ploughing through the whole stack.
+  STACK.forEach(([name, color], i) => {
+    const size = 2.6;
+    const x = 34 + Math.floor(i / 2) * 6.4;
+    const z = 28 + (i % 2 === 0 ? -4.5 : 4.5);
+    addProp(
+      stackBlock(name, color, size),
+      new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2)),
+      [x, size / 2, z],
+      3
+    );
+    count++;
+  });
+
+  // And a scattering of bigger ones out in the open, as landmarks
+  count += scatter(16, () => {
+    const [name, color] = one(STACK);
+    return { name, color, height: 3.4 + rand() * 1.6, collide: true, mass: 4, stack: true };
+  });
 
   // Obelisks marking the roundabout approach
   for (const [ox, oz] of [
