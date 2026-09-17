@@ -1,7 +1,7 @@
 import { Octokit } from 'octokit';
 
 const octokit = new Octokit({ auth: import.meta.env.GITHUB_TOKEN });
-const username = import.meta.env.GITHUB_USERNAME || 'Brandon255-rgb';
+const username = import.meta.env.GITHUB_USERNAME || 'brandonvv-dev';
 
 export interface GitHubRepo {
   id: number;

@@ -259,6 +259,43 @@ video {
   transform: none;
 }
 
+/*
+ * Depth headline: words start far down the z-axis (small, sitting low) and fly
+ * toward the viewer, overshooting the screen plane before settling. Shares the
+ * .reveal-words word split, so only the transform track differs.
+ * Perspective lives on the h1 so words off-centre splay outward as they arrive.
+ */
+.reveal-depth {
+  perspective: 900px;
+  perspective-origin: 50% 60%;
+  transform-style: preserve-3d;
+}
+.reveal-words.reveal-depth .w {
+  opacity: 0;
+  transform: translate3d(0, 0.55em, -1800px);
+}
+.reveal-words.reveal-depth.is-in .w {
+  animation: word-forward 1.15s var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 120ms);
+}
+@keyframes word-forward {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0.55em, -1800px);
+  }
+  55% {
+    opacity: 1;
+  }
+  78% {
+    opacity: 1;
+    transform: translate3d(0, -0.03em, 60px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* --- 2. Continuous scroll-linked motion ------------------- */
 @media (prefers-reduced-motion: no-preference) {
   @supports (animation-timeline: view()) {

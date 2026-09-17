@@ -21,7 +21,7 @@ export const projects: Project[] = [
     description: "Real-time data streaming platform with Apache Kafka integration",
     longDescription: "Developed a high-performance streaming analytics dashboard processing 10k+ events per second. Features real-time data visualization, custom pipeline configurations, and multi-source data ingestion. Optimized for low-latency monitoring with automated alerting and anomaly detection.",
     tech: ["Apache Kafka", "React", "Python", "D3.js", "Redis", "Docker", "Kubernetes"],
-    github: "https://github.com/Brandon255-rgb/kafka-dashboard",
+    github: "https://github.com/brandonvv-dev/kafka-dashboard",
     image: "/images/Proof of Work/kafka-streaming-dashboard/home.webp",
     images: [
       "/images/Proof of Work/kafka-streaming-dashboard/data sources.webp",
@@ -47,7 +47,7 @@ export const projects: Project[] = [
     description: "Intelligent platform for coding assessments with automated evaluation",
     longDescription: "Built a comprehensive coding challenge platform with AI-powered code review, automated testing, and real-time feedback. Features include difficulty-adaptive challenges, performance analytics, skill tracking with badges, and detailed coding metrics. Used by companies for technical interviews and by developers for skill improvement.",
     tech: ["TypeScript", "React", "Python", "FastAPI", "PostgreSQL", "Docker", "OpenAI API"],
-    github: "https://github.com/Brandon255-rgb/recode-platform",
+    github: "https://github.com/brandonvv-dev/recode-platform",
     image: "/images/Proof of Work/Recode/coding_challenge.png",
     images: [
       "/images/Proof of Work/Recode/coding_challenge.png",
@@ -68,7 +68,7 @@ export const projects: Project[] = [
     description: "Automated invoice processing with intelligent data extraction",
     longDescription: "Developed an AI-powered invoice management system that automatically extracts, categorizes, and processes invoices from multiple formats. Features OCR, smart data validation, duplicate detection, and seamless ERP integration. Reduced manual processing time by 80% and improved accuracy to 99.5%.",
     tech: ["Python", "TensorFlow", "FastAPI", "PostgreSQL", "Celery", "Redis", "React"],
-    github: "https://github.com/Brandon255-rgb/ai-invoice-manager",
+    github: "https://github.com/brandonvv-dev/ai-invoice-manager",
     image: "/images/Proof of Work/ai-invoice-manager/home.webp",
     images: [
       "/images/Proof of Work/ai-invoice-manager/home.webp"
@@ -81,7 +81,7 @@ export const projects: Project[] = [
     description: "Full-stack university platform with comprehensive admin dashboard",
     longDescription: "Built a complete university management system featuring student enrollment, course management, financial tracking, and analytics. Includes real-time dashboards for monitoring sales, suppliers, products, and fiscal calendars. Implemented with role-based access control and automated reporting.",
     tech: ["React", "Node.js", "PostgreSQL", "TypeScript", "Chart.js", "Tailwind CSS"],
-    github: "https://github.com/Brandon255-rgb/university-system",
+    github: "https://github.com/brandonvv-dev/university-system",
     image: "/images/Proof of Work/University Website/whbd8cylzblqjumatmje.webp",
     images: [
       "/images/Proof of Work/University Website/e28jzmcmxt4fz0zrdnfw.webp",
@@ -100,7 +100,7 @@ export const projects: Project[] = [
     description: "Modern appointment booking system with reviews and analytics",
     longDescription: "Created a complete salon management platform with online booking, customer reviews, location management, and business analytics. Features automated appointment reminders, staff scheduling, and integrated payment processing. Improved booking efficiency by 45% and customer satisfaction scores.",
     tech: ["Next.js", "TypeScript", "Prisma", "PostgreSQL", "Stripe", "Tailwind CSS"],
-    github: "https://github.com/Brandon255-rgb/nail-salon",
+    github: "https://github.com/brandonvv-dev/nail-salon",
     image: "/images/Proof of Work/Nail salon Website/home.webp",
     images: [
       "/images/Proof of Work/Nail salon Website/description.webp",
@@ -117,7 +117,7 @@ export const projects: Project[] = [
     description: "Beautiful salon website with booking and location features",
     longDescription: "Designed and developed a modern nail salon website with elegant UI/UX, online booking integration, multiple location support, and customer reviews showcase. Features responsive design, fast loading times, and SEO optimization. Increased online bookings by 60% and improved customer engagement.",
     tech: ["React", "TypeScript", "Tailwind CSS", "Framer Motion", "Next.js"],
-    github: "https://github.com/Brandon255-rgb/nail-salon-website",
+    github: "https://github.com/brandonvv-dev/nail-salon-website",
     image: "/images/Proof of Work/nail-salon-website 2/home.webp",
     images: [
       "/images/Proof of Work/nail-salon-website 2/book.webp",
@@ -139,7 +139,7 @@ export const projects: Project[] = [
     description: "Production-ready fine-tuning system for domain-specific language models",
     longDescription: "Engineered an automated pipeline for fine-tuning large language models on custom datasets. Implemented LoRA/QLoRA techniques for efficient training, with automated evaluation metrics and A/B testing framework. Reduced training costs by 60% while improving model performance on domain-specific tasks. Handles datasets up to 50GB with distributed training across multiple GPUs.",
     tech: ["Python", "PyTorch", "Hugging Face Transformers", "CUDA", "MLflow", "Docker", "AWS SageMaker"],
-    github: "https://github.com/Brandon255-rgb/llm-finetuning-pipeline",
+    github: "https://github.com/brandonvv-dev/llm-finetuning-pipeline",
     image: "/images/Proof of Work/finetuning-ai/finetuning (1).png",
     images: [
       "/images/Proof of Work/finetuning-ai/finetuning (1).png",

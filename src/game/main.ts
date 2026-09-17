@@ -2,11 +2,24 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Car, loadCarModel } from './car';
-import { buildWorld, type Board } from './world';
+import { buildWorld, type Board, type Spot } from './world';
+import { loadPropLibrary } from './props';
 import { createInput } from './input';
 
 /** Swap for any other model in /public/models — it is measured, not assumed. */
 const CAR_MODEL = '/models/sedan-sports.glb';
+
+const SCENERY = [
+  'tree_default', 'tree_detailed', 'tree_oak', 'tree_blocks', 'tree_cone',
+  'tree_fat', 'tree_pineDefaultA', 'tree_pineRoundA', 'rock_largeA',
+  'rock_largeB', 'rock_smallA', 'rock_smallB', 'plant_bush', 'plant_bushLarge',
+  'grass', 'grass_large', 'flower_redA', 'flower_yellowA', 'flower_purpleA',
+  'log', 'log_stack', 'stump_round', 'stump_old', 'statue_obelisk',
+  'televisionModern',
+].map((n) => `/models/props/${n}.glb`);
+
+// These carry the car kit's colour atlas, so they load from beside the cars.
+const LITTER = ['cone', 'box', 'debris-tire'].map((n) => `/models/${n}.glb`);
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -73,11 +86,13 @@ async function boot() {
   const textures = new THREE.TextureLoader(manager);
   const gltf = new GLTFLoader(manager);
 
+  const lib = await loadPropLibrary([...SCENERY, ...LITTER], gltf);
   const bits = buildWorld(
     scene,
     world,
     groundMaterial,
     textures,
+    lib,
     renderer.capabilities.getMaxAnisotropy()
   );
   const model = await loadCarModel(CAR_MODEL, gltf);
@@ -148,51 +163,66 @@ async function boot() {
   resetBtn.addEventListener('click', () => car.reset());
 
   /* --------------------------------------------------------------- panel */
-  let activeBoard: Board | null = null;
-  let cvShown = false;
+  // One renderer for every kind of pad. Keyed, so a panel is only rebuilt
+  // when what you are standing on actually changes.
+  let panelKey = '';
 
-  function showBoard(board: Board | null) {
-    if (board === activeBoard) return;
-    activeBoard = board;
-
-    if (!board) {
+  const setPanel = (key: string, html: string) => {
+    if (key === panelKey) return;
+    panelKey = key;
+    if (!key) {
       panel.hidden = true;
       panel.innerHTML = '';
       return;
     }
-
-    const s = board.site;
     panel.hidden = false;
-    panel.innerHTML = `
-      <p class="panel-kicker">Site ${String(s.num).padStart(2, '0')} of 20</p>
-      <h2>${s.name}</h2>
-      <img class="panel-shot" src="${s.card}" alt="" loading="lazy" />
-      <div class="panel-links">
-        <a href="/#site-${s.slug}">See all ${s.images.length} screens &rsaquo;</a>
-      </div>`;
-  }
+    panel.innerHTML = html;
+  };
 
-  function showCv(show: boolean) {
-    if (show === cvShown) return;
-    cvShown = show;
-    if (!show) {
-      if (!activeBoard) {
-        panel.hidden = true;
-        panel.innerHTML = '';
-      }
-      return;
+  const boardPanel = (b: Board) => `
+    <p class="panel-kicker">Site ${String(b.site.num).padStart(2, '0')} of 20</p>
+    <h2>${b.site.name}</h2>
+    <img class="panel-shot" src="${b.site.card}" alt="" loading="lazy" />
+    <div class="panel-links">
+      <a href="/#site-${b.site.slug}">See all ${b.site.images.length} screens &rsaquo;</a>
+    </div>`;
+
+  const spotPanel = (s: Spot) => `
+    <p class="panel-kicker" style="color:${s.accent}">${s.sub}</p>
+    <h2>${s.title}</h2>
+    <p class="panel-desc">${s.body}</p>
+    ${
+      s.tags.length
+        ? `<ul class="panel-tech">${s.tags.map((t) => `<li>${t}</li>`).join('')}</ul>`
+        : ''
     }
-    activeBoard = null;
-    panel.hidden = false;
-    panel.innerHTML = `
-      <p class="panel-kicker">Finish line</p>
-      <h2>Brandon van Vuuren &mdash; CV</h2>
-      <p class="panel-desc">The whole thing in PDF form: experience, education, stack.</p>
-      <div class="panel-links">
-        <a href="/assets/CV Brandon van Vuuren.pdf" target="_blank" rel="noopener">Open the PDF &rsaquo;</a>
-        <a href="/assets/CV Brandon van Vuuren.pdf" download>Download &rsaquo;</a>
-      </div>`;
-  }
+    <div class="panel-links">
+      <a href="${s.url}"${
+        /^https?:/.test(s.url) ? ' target="_blank" rel="noopener"' : ''
+      }>${s.cta} &rsaquo;</a>
+    </div>`;
+
+  const cvPanel = () => `
+    <p class="panel-kicker">Finish line</p>
+    <h2>Brandon van Vuuren &mdash; CV</h2>
+    <p class="panel-desc">The whole thing in PDF form: experience, education, stack.</p>
+    <div class="panel-links">
+      <a href="/assets/CV Brandon van Vuuren.pdf" target="_blank" rel="noopener">Open the PDF &rsaquo;</a>
+      <a href="/assets/CV Brandon van Vuuren.pdf" download>Download &rsaquo;</a>
+    </div>`;
+
+  /** Is the car standing on this yawed pad? */
+  const onPad = (
+    px: number,
+    pz: number,
+    at: { position: THREE.Vector3; yaw: number; half: { x: number; z: number } }
+  ) => {
+    const dx = px - at.position.x;
+    const dz = pz - at.position.z;
+    const c = Math.cos(at.yaw);
+    const sn = Math.sin(at.yaw);
+    return Math.abs(dx * c - dz * sn) < at.half.x && Math.abs(dx * sn + dz * c) < at.half.z;
+  };
 
   /* ---------------------------------------------------------------- loop */
   const camTarget = new THREE.Vector3();
@@ -297,28 +327,18 @@ async function boot() {
       bits.sun.target.position.copy(pos);
       bits.sun.target.updateMatrixWorld();
 
-      // Proximity: whichever pad the car is standing on wins. Pads are yawed
-      // (the roundabout and courtyard ones face inward), so the offset is
-      // rotated into pad-local space before the extents are compared.
-      let near: Board | null = null;
-      for (const board of bits.boards) {
-        const dx = pos.x - board.position.x;
-        const dz = pos.z - board.position.z;
-        const c = Math.cos(board.yaw);
-        const sn = Math.sin(board.yaw);
-        if (
-          Math.abs(dx * c - dz * sn) < board.half.x &&
-          Math.abs(dx * sn + dz * c) < board.half.z
-        ) {
-          near = board;
-          break;
+      // Whichever pad the car is standing on wins, finish line first.
+      if (Math.hypot(pos.x - bits.cv.position.x, pos.z - bits.cv.position.z) < bits.cv.radius) {
+        setPanel('cv', cvPanel());
+      } else {
+        const spot = bits.spots.find((sp) => onPad(pos.x, pos.z, sp));
+        if (spot) {
+          setPanel(`spot:${spot.id}`, spotPanel(spot));
+        } else {
+          const board = bits.boards.find((bd) => onPad(pos.x, pos.z, bd));
+          setPanel(board ? `board:${board.site.slug}` : '', board ? boardPanel(board) : '');
         }
       }
-      const onCv =
-        Math.hypot(pos.x - bits.cv.position.x, pos.z - bits.cv.position.z) < bits.cv.radius;
-
-      showCv(onCv);
-      if (!onCv) showBoard(near);
 
       speedEl.textContent = String(Math.round(car.speedKmh));
 
@@ -349,6 +369,7 @@ async function boot() {
     resetClock(); // drop the idle time so the first frame isn't a huge step
     camTarget.copy(camera.position);
     bits.start();
+    bits.playVideo(); // browsers only allow this off a user gesture
     canvas.focus();
   });
 

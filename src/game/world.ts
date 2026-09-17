@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { sites, type Site } from '../data/sites';
+import type { PropLibrary } from './props';
+import { dressWorld, type Spot } from './dressing';
+
+export type { Spot };
 
 export interface Board {
   site: Site;
@@ -27,6 +31,10 @@ interface Prop {
 
 export interface WorldBits {
   boards: Board[];
+  /** Drive-on pads that link out: Axiom, LinkedIn, GitHub, email. */
+  spots: Spot[];
+  /** Kicks off the Axiom demo reel; needs a user gesture. */
+  playVideo: () => void;
   sun: THREE.DirectionalLight;
   /** Solid things the chase camera must not end up behind. */
   blockers: THREE.Object3D[];
@@ -174,6 +182,7 @@ export function buildWorld(
   world: CANNON.World,
   groundMaterial: CANNON.Material,
   loader: THREE.TextureLoader,
+  lib: PropLibrary,
   maxAnisotropy = 8
 ): WorldBits {
   const props: Prop[] = [];
@@ -608,20 +617,38 @@ export function buildWorld(
     }
   }
 
-  // A ramp, because everyone tries to jump something. Kept well clear of the
-  // spawn: parked on top of it, the car beaches and the wheels lose the floor.
+  // A ramp, because everyone tries to jump something. You approach from +Z,
+  // so it has to *rise* towards -Z: tilted the other way its leading edge is
+  // a three-metre wall you simply crash into. Positioned so that edge sits on
+  // the floor, which is what makes it rideable rather than a kerb.
+  const RAMP = { tilt: 0.16, halfZ: 9, halfY: 0.4 };
+  const rampY =
+    RAMP.halfY * Math.cos(RAMP.tilt) + RAMP.halfZ * Math.sin(RAMP.tilt) + 0.02;
+
   const rampQuat = new CANNON.Quaternion();
-  rampQuat.setFromEuler(-0.26, 0, 0);
+  rampQuat.setFromEuler(RAMP.tilt, 0, 0);
   const ramp = new THREE.Mesh(
-    new THREE.BoxGeometry(12, 0.8, 16),
+    new THREE.BoxGeometry(12, RAMP.halfY * 2, RAMP.halfZ * 2),
     new THREE.MeshStandardMaterial({ color: 0x3f4756, roughness: 0.75 })
   );
-  ramp.position.set(PLAY.x, 1.9, PLAY.z + 30);
-  ramp.rotation.x = -0.26;
-  addStatic(ramp, new CANNON.Box(new CANNON.Vec3(6, 0.4, 8)), rampQuat);
+  ramp.position.set(PLAY.x, rampY, PLAY.z + 30);
+  ramp.rotation.x = RAMP.tilt;
+  addStatic(ramp, new CANNON.Box(new CANNON.Vec3(6, RAMP.halfY, RAMP.halfZ)), rampQuat);
 
   sign('JUMP', 10, PLAY.x, PLAY.z + 46);
   sign('PLAYGROUND', 26, PLAY.x, PLAY.z + 58);
+
+  /* ----------------------------------------------------- signage & scenery */
+
+  const dressing = dressWorld({
+    scene,
+    world,
+    groundMaterial,
+    lib,
+    decal,
+    addProp,
+    blockers,
+  });
 
   /* ----------------------------------------------------------- lifecycle */
 
@@ -676,5 +703,15 @@ export function buildWorld(
     }
   };
 
-  return { boards, sun, blockers, cv: { position: cvPos, radius: 7 }, score, update, start };
+  return {
+    boards,
+    spots: dressing.spots,
+    playVideo: dressing.playVideo,
+    sun,
+    blockers,
+    cv: { position: cvPos, radius: 7 },
+    score,
+    update,
+    start,
+  };
 }
