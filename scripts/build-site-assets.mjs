@@ -1,7 +1,9 @@
 /**
  * One-off: 191 source PNGs (158 MB) -> web-sized WebP, plus a generated data file.
- * Three outputs per site: full gallery images, a 16:10 card, and a small
- * texture for the 3D board (GPU memory, not bandwidth, is the constraint there).
+ * Three outputs per site: full gallery images, a 16:10 card, and a texture for
+ * the 3D billboard. The billboard is read close-up in game, so it carries real
+ * resolution; the cap is GPU memory (20 of these live on the card at once),
+ * not bandwidth.
  */
 import sharp from 'sharp';
 import { readdir, mkdir, writeFile } from 'node:fs/promises';
@@ -60,8 +62,8 @@ for (const dir of dirs) {
         .webp({ quality: 80 })
         .toFile(path.join(outDir, 'card.webp'));
       await sharp(src)
-        .resize({ width: 768, height: 480, fit: 'cover', position: 'top' })
-        .webp({ quality: 72 })
+        .resize({ width: 1024, height: 640, fit: 'cover', position: 'top' })
+        .webp({ quality: 84 })
         .toFile(path.join(outDir, 'board.webp'));
     }
   }

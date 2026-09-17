@@ -5,21 +5,31 @@ import { sites, type Site } from '../data/sites';
 export interface Board {
   site: Site;
   position: THREE.Vector3;
-  /** Half-extents on X and Z: the panel opens when you are standing on it. */
+  /** Yaw of the pad. Local +Z is the side you drive in from. */
+  yaw: number;
+  /** Half-extents in pad-local X and Z. */
   half: { x: number; z: number };
 }
 
-/** A knockable prop. `home` is where it comes to rest, used to score hits. */
+/**
+ * A knockable prop. `home` is latched the moment this prop first falls asleep,
+ * which is the only reliable definition of "where it ended up": the drop-in
+ * scatters stacks, so the authored mark is not where things actually rest.
+ */
 interface Prop {
   mesh: THREE.Object3D;
   body: CANNON.Body;
   home: CANNON.Vec3;
+  woken: boolean;
+  settled: boolean;
   knocked: boolean;
 }
 
 export interface WorldBits {
   boards: Board[];
   sun: THREE.DirectionalLight;
+  /** Solid things the chase camera must not end up behind. */
+  blockers: THREE.Object3D[];
   cv: { position: THREE.Vector3; radius: number };
   /** How many props have been shoved off their mark, and how many exist. */
   score: () => { knocked: number; total: number };
@@ -28,9 +38,11 @@ export interface WorldBits {
   start: () => void;
 }
 
-/** Rectangular arena, pushed back so the long avenue fits inside it. */
-const ARENA = { hx: 105, hz: 112, cz: -40 };
-const BOARD = { w: 16, d: 10, gapZ: 14, x: 15, z0: 10 };
+/** Square arena with room to keep driving past every zone. */
+const ARENA = { hx: 130, hz: 150, cz: -20 };
+const PAD = { w: 14, d: 9 };
+const POSTER_W = 11;
+
 /**
  * Props are authored at their resting height and spawned this far above it.
  * Kept small on purpose: dropped from any real height a stacked wall or
@@ -38,6 +50,19 @@ const BOARD = { w: 16, d: 10, gapZ: 14, x: 15, z0: 10 };
  */
 const DROP = 3.5;
 const SKY = 0xcfe0f2;
+
+/**
+ * Where each zone sits. The avenue runs -Z from the start plaza.
+ *
+ * Mind the spacing: avenue pads are yawed 90 degrees, so a pad's *width*
+ * (PAD.w) runs along the road, not its depth. Rows closer together than
+ * PAD.w overlap into each other and the painted names run together.
+ */
+const AVENUE = { x: 20, z0: 92, gap: 20, rows: 5 };
+const ROUNDABOUT = { x: 0, z: -60, r: 50, pad: 62 };
+const COURTYARD = { x: 86, z: 26, r: 28 };
+const PLAY = { x: -82, z: 30 };
+const CV_Z = -140;
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -97,7 +122,7 @@ function decal(text: string, width: number, height: number, color = '#ffffff') {
     new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })
   );
   mesh.rotation.x = -Math.PI / 2;
-  mesh.renderOrder = 1;
+  mesh.renderOrder = 2;
   return mesh;
 }
 
@@ -136,7 +161,7 @@ function addSky(scene: THREE.Scene) {
   tex.colorSpace = THREE.SRGBColorSpace;
 
   const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(420, 24, 16),
+    new THREE.SphereGeometry(520, 24, 16),
     new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false })
   );
   scene.add(sky);
@@ -148,10 +173,12 @@ export function buildWorld(
   scene: THREE.Scene,
   world: CANNON.World,
   groundMaterial: CANNON.Material,
-  loader: THREE.TextureLoader
+  loader: THREE.TextureLoader,
+  maxAnisotropy = 8
 ): WorldBits {
   const props: Prop[] = [];
   const spinners: { mesh: THREE.Object3D; speed: number; bob: number }[] = [];
+  const blockers: THREE.Object3D[] = [];
 
   /**
    * Adds a prop parked in the sky above `rest`, held asleep until start().
@@ -177,6 +204,8 @@ export function buildWorld(
       mesh,
       body,
       home: new CANNON.Vec3(rest[0], rest[1], rest[2]),
+      woken: false,
+      settled: false,
       knocked: false,
     });
   };
@@ -193,7 +222,7 @@ export function buildWorld(
 
   // --- Sky, light, fog ---------------------------------------------------
   addSky(scene);
-  scene.fog = new THREE.Fog(SKY, 110, 340);
+  scene.fog = new THREE.Fog(SKY, 130, 420);
   scene.add(new THREE.HemisphereLight(0xdfeaff, 0x6b7280, 2.2));
 
   const sun = new THREE.DirectionalLight(0xfff4e2, 2.6);
@@ -232,25 +261,60 @@ export function buildWorld(
   groundBody.position.set(0, -1, ARENA.cz); // top face sits exactly at y = 0
   world.addBody(groundBody);
 
-  // Painted avenue down the middle
-  const lane = new THREE.Mesh(
-    new THREE.PlaneGeometry(18, ARENA.hz * 1.85),
-    new THREE.MeshStandardMaterial({ color: 0x8b919c, roughness: 0.95 })
-  );
-  lane.rotation.x = -Math.PI / 2;
-  lane.position.set(0, 0.01, ARENA.cz);
-  lane.receiveShadow = true;
-  scene.add(lane);
+  // --- Painted roads -----------------------------------------------------
+  const tarmac = new THREE.MeshStandardMaterial({ color: 0x8b919c, roughness: 0.95 });
 
-  for (let i = 0; i < 42; i++) {
+  const road = (x: number, z: number, w: number, l: number, yaw = 0) => {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, l), tarmac);
+    mesh.rotation.set(-Math.PI / 2, 0, 0);
+    mesh.rotateZ(-yaw);
+    mesh.position.set(x, 0.01, z);
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+  };
+
+  road(0, 30, 20, 220); // the avenue, start plaza down to the roundabout
+  road(COURTYARD.x / 2, 26, 110, 18, Math.PI / 2); // spur east to the courtyard
+  road(PLAY.x / 2, 30, 110, 18, Math.PI / 2); // spur west to the playground
+  road(0, CV_Z + 24, 20, 70); // roundabout down to the finish
+
+  // Ring road around the roundabout island
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(ROUNDABOUT.r - 13, ROUNDABOUT.r + 9, 48),
+    tarmac
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(ROUNDABOUT.x, 0.011, ROUNDABOUT.z);
+  ring.receiveShadow = true;
+  scene.add(ring);
+
+  // Centre lines down the avenue
+  for (let i = 0; i < 30; i++) {
     const dash = new THREE.Mesh(
       new THREE.PlaneGeometry(0.5, 3),
       new THREE.MeshBasicMaterial({ color: 0xf2f4f7 })
     );
     dash.rotation.x = -Math.PI / 2;
-    dash.position.set(0, 0.02, 44 - i * 5.5);
+    dash.position.set(0, 0.02, 124 - i * 5.5);
     scene.add(dash);
   }
+
+  // Grass island in the middle of the roundabout
+  const island = new THREE.Mesh(
+    new THREE.CircleGeometry(ROUNDABOUT.r - 14, 40),
+    new THREE.MeshStandardMaterial({ color: 0x74996a, roughness: 0.95 })
+  );
+  island.rotation.x = -Math.PI / 2;
+  island.position.set(ROUNDABOUT.x, 0.012, ROUNDABOUT.z);
+  island.receiveShadow = true;
+  scene.add(island);
+
+  // Nothing solid in the middle of the island. Static, it is a dead stop on
+  // the centre line; knockable, the car climbs the toppled cylinder and
+  // beaches on it. Paint the centrepiece on the grass instead.
+  const crest = decal('BvV', 26, 14, '#e8f0e6');
+  crest.position.set(ROUNDABOUT.x, 0.02, ROUNDABOUT.z);
+  scene.add(crest);
 
   // --- Perimeter walls ---------------------------------------------------
   const wallMat = new THREE.MeshStandardMaterial({ color: 0xe8ebf0, roughness: 0.8 });
@@ -270,13 +334,14 @@ export function buildWorld(
     body.position.set(x, 1.5, z);
     body.quaternion.setFromEuler(0, yaw, 0);
     world.addBody(body);
+    blockers.push(mesh);
   };
   barrier(ARENA.hx, 0, ARENA.cz - ARENA.hz, 0);
   barrier(ARENA.hx, 0, ARENA.cz + ARENA.hz, 0);
   barrier(ARENA.hz, -ARENA.hx, ARENA.cz, Math.PI / 2);
   barrier(ARENA.hz, ARENA.hx, ARENA.cz, Math.PI / 2);
 
-  // --- Start plaza: instructions painted on the floor ---------------------
+  // --- Signposting painted on the floor ----------------------------------
   const plaza = new THREE.Group();
   plaza.add(decal('DRIVE MY CV', 30, 5));
   const sub = decal('WASD / ARROWS', 18, 2.6, '#1d2430');
@@ -287,14 +352,22 @@ export function buildWorld(
     arrow.position.set(0, 0.01, -7 - i * 5);
     plaza.add(arrow);
   }
-  plaza.position.set(0, 0.03, 42);
+  plaza.position.set(0, 0.03, 118);
   scene.add(plaza);
 
-  const toPlay = decal('◀ PLAYGROUND', 22, 3.4, '#1d2430');
-  toPlay.position.set(-28, 0.04, 20);
-  scene.add(toPlay);
+  const sign = (text: string, w: number, x: number, z: number, yaw = 0) => {
+    const d = decal(text, w, w * 0.16, '#1d2430');
+    d.position.set(x, 0.04, z);
+    d.rotateZ(-yaw);
+    scene.add(d);
+  };
+  sign('◀  PLAYGROUND', 34, -36, 26);
+  sign('COURTYARD  ▶', 34, 36, 26);
+  sign('ROUNDABOUT  ▲', 30, 0, -4);
+  sign('FINISH  ▲', 22, 0, CV_Z + 34);
 
-  // --- The 20 boards -----------------------------------------------------
+  /* ------------------------------------------------------------- boards */
+
   const boards: Board[] = [];
   const kerbMat = new THREE.MeshStandardMaterial({ color: 0xf4f6f9, roughness: 0.7 });
   const postMat = new THREE.MeshStandardMaterial({
@@ -302,20 +375,26 @@ export function buildWorld(
     roughness: 0.4,
     metalness: 0.3,
   });
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x4a5261, roughness: 0.8 });
 
-  sites.forEach((site, i) => {
-    const side = i % 2 === 0 ? -1 : 1;
-    const row = Math.floor(i / 2);
-    const pos = new THREE.Vector3(side * BOARD.x, 0, BOARD.z0 - row * BOARD.gapZ);
-
+  /**
+   * One site pad: the screenshot on the tarmac, a kerb around it, the name
+   * painted at the near edge, and the billboard standing at the far edge.
+   * Local +Z is the approach side, so the whole thing just gets yawed.
+   */
+  const placeBoard = (site: Site, x: number, z: number, yaw: number) => {
     const group = new THREE.Group();
-    group.position.copy(pos);
+    group.position.set(x, 0, z);
+    group.rotation.y = yaw;
 
     const tex = loader.load(site.board);
     tex.colorSpace = THREE.SRGBColorSpace;
+    // Without this the poster is read at an angle and smears; it is the single
+    // biggest difference between a crisp billboard and a blurry one.
+    tex.anisotropy = maxAnisotropy;
 
     const panel = new THREE.Mesh(
-      new THREE.PlaneGeometry(BOARD.w, BOARD.d),
+      new THREE.PlaneGeometry(PAD.w, PAD.d),
       new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75, metalness: 0 })
     );
     panel.rotation.x = -Math.PI / 2;
@@ -323,12 +402,11 @@ export function buildWorld(
     panel.receiveShadow = true;
     group.add(panel);
 
-    // Raised kerb, so a board is somewhere you drive into, not a sticker
     for (const [kw, kd, kx, kz] of [
-      [BOARD.w + 1, 0.5, 0, BOARD.d / 2 + 0.25],
-      [BOARD.w + 1, 0.5, 0, -BOARD.d / 2 - 0.25],
-      [0.5, BOARD.d, BOARD.w / 2 + 0.25, 0],
-      [0.5, BOARD.d, -BOARD.w / 2 - 0.25, 0],
+      [PAD.w + 1, 0.5, 0, PAD.d / 2 + 0.25],
+      [PAD.w + 1, 0.5, 0, -PAD.d / 2 - 0.25],
+      [0.5, PAD.d, PAD.w / 2 + 0.25, 0],
+      [0.5, PAD.d, -PAD.w / 2 - 0.25, 0],
     ]) {
       const kerb = new THREE.Mesh(new THREE.BoxGeometry(kw, 0.22, kd), kerbMat);
       kerb.position.set(kx, 0.11, kz);
@@ -337,25 +415,23 @@ export function buildWorld(
     }
 
     // Painted on the floor rather than floating above it: twenty billboards
-    // down one avenue overlap into an unreadable wall from any distance.
+    // stacked down one road overlap into an unreadable wall from any distance.
     const name = decal(
       `${String(site.num).padStart(2, '0')}  ${site.name.toUpperCase()}`,
-      BOARD.w,
+      PAD.w,
       1.9,
       '#141a22'
     );
-    name.position.set(0, 0.06, BOARD.d / 2 + 1.6);
+    name.position.set(0, 0.06, PAD.d / 2 + 1.6);
     group.add(name);
 
-    // An upright poster on the outer edge. Flat on the tarmac a screenshot is
-    // viewed at a grazing angle and reads as a pale smear; standing up, the
-    // avenue becomes twenty legible posters you drive between.
-    const PW = 12;
-    const PH = PW * 0.625;
-    const facing = side * (BOARD.w / 2 + 1.2);
+    // Upright poster on the far edge, facing the way you drive in. Flat on the
+    // tarmac a screenshot is seen at a grazing angle and reads as a smear.
+    const PH = POSTER_W * 0.625;
+    const back = -PAD.d / 2 - 1.2;
 
     const poster = new THREE.Mesh(
-      new THREE.PlaneGeometry(PW, PH),
+      new THREE.PlaneGeometry(POSTER_W, PH),
       new THREE.MeshStandardMaterial({
         map: tex,
         roughness: 0.6,
@@ -363,47 +439,88 @@ export function buildWorld(
         side: THREE.DoubleSide,
       })
     );
-    poster.position.set(facing, 1.4 + PH / 2, 0);
-    poster.rotation.y = side === -1 ? Math.PI / 2 : -Math.PI / 2;
+    poster.position.set(0, 1.4 + PH / 2, back);
     poster.castShadow = true;
     group.add(poster);
 
     const frame = new THREE.Mesh(
-      new THREE.BoxGeometry(0.3, PH + 0.5, PW + 0.5),
-      new THREE.MeshStandardMaterial({ color: 0x20242c, roughness: 0.7 })
+      new THREE.BoxGeometry(POSTER_W + 0.5, PH + 0.5, 0.3),
+      frameMat
     );
-    frame.position.set(facing + side * 0.18, 1.4 + PH / 2, 0);
+    frame.position.set(0, 1.4 + PH / 2, back - 0.18);
     frame.castShadow = true;
     group.add(frame);
+    blockers.push(frame);
 
     for (const end of [-1, 1]) {
       const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.5, 10), postMat);
-      leg.position.set(facing + side * 0.18, 0.75, end * (PW / 2 - 1));
+      leg.position.set(end * (POSTER_W / 2 - 1), 0.75, back - 0.18);
       leg.castShadow = true;
       group.add(leg);
     }
 
     scene.add(group);
-    boards.push({ site, position: pos, half: { x: BOARD.w / 2, z: BOARD.d / 2 } });
+    boards.push({
+      site,
+      position: new THREE.Vector3(x, 0, z),
+      yaw,
+      half: { x: PAD.w / 2, z: PAD.d / 2 },
+    });
+  };
+
+  // Zone 1 - the avenue: five rows either side of the start road.
+  sites.slice(0, 10).forEach((site, i) => {
+    const side = i % 2 === 0 ? -1 : 1;
+    const row = Math.floor(i / 2);
+    // You arrive from the road, so local +Z points back at the centre line.
+    placeBoard(
+      site,
+      side * AVENUE.x,
+      AVENUE.z0 - row * AVENUE.gap,
+      side === -1 ? Math.PI / 2 : -Math.PI / 2
+    );
   });
 
-  // --- CV podium at the head of the avenue -------------------------------
-  const lastRow = Math.ceil(sites.length / 2) - 1;
-  const cvPos = new THREE.Vector3(0, 0, BOARD.z0 - lastRow * BOARD.gapZ - 26);
+  // Zone 2 - the roundabout: six pads facing the island.
+  sites.slice(10, 16).forEach((site, i) => {
+    const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+    const x = ROUNDABOUT.x + Math.sin(a) * ROUNDABOUT.pad;
+    const z = ROUNDABOUT.z + Math.cos(a) * ROUNDABOUT.pad;
+    placeBoard(site, x, z, a + Math.PI); // +Z faces the island
+  });
 
+  // Zone 3 - the courtyard: four pads around a square off the east spur.
+  sites.slice(16, 20).forEach((site, i) => {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const x = COURTYARD.x + Math.sin(a) * COURTYARD.r;
+    const z = COURTYARD.z + Math.cos(a) * COURTYARD.r;
+    placeBoard(site, x, z, a + Math.PI);
+  });
+
+  const courtyardFloor = new THREE.Mesh(
+    new THREE.CircleGeometry(COURTYARD.r - 12, 32),
+    new THREE.MeshStandardMaterial({ color: 0x74996a, roughness: 0.95 })
+  );
+  courtyardFloor.rotation.x = -Math.PI / 2;
+  courtyardFloor.position.set(COURTYARD.x, 0.012, COURTYARD.z);
+  courtyardFloor.receiveShadow = true;
+  scene.add(courtyardFloor);
+
+  // --- CV podium, with room to keep driving past it ----------------------
+  const cvPos = new THREE.Vector3(0, 0, CV_Z);
   const cvGroup = new THREE.Group();
   cvGroup.position.copy(cvPos);
 
   const podium = new THREE.Mesh(
-    new THREE.CylinderGeometry(6, 7, 0.6, 32),
+    new THREE.CylinderGeometry(6, 7, 0.3, 32),
     new THREE.MeshStandardMaterial({ color: 0xe9ecf1, roughness: 0.7 })
   );
-  podium.position.y = 0.3;
+  podium.position.y = 0.15;
   podium.receiveShadow = true;
   cvGroup.add(podium);
 
   const sheet = new THREE.Mesh(
-    new THREE.BoxGeometry(3.2, 4.4, 0.2),
+    new THREE.BoxGeometry(2.6, 3.6, 0.18),
     new THREE.MeshStandardMaterial({
       color: 0xffffff,
       emissive: 0x2997ff,
@@ -411,10 +528,10 @@ export function buildWorld(
       roughness: 0.35,
     })
   );
-  sheet.position.y = 3.4;
+  sheet.position.y = 3.2;
   sheet.castShadow = true;
   cvGroup.add(sheet);
-  spinners.push({ mesh: sheet, speed: 0.8, bob: 3.4 });
+  spinners.push({ mesh: sheet, speed: 0.8, bob: 3.2 });
 
   const cvLabel = new THREE.Sprite(
     new THREE.SpriteMaterial({
@@ -422,17 +539,12 @@ export function buildWorld(
       transparent: true,
     })
   );
-  cvLabel.scale.set(13, 3.25, 1);
-  cvLabel.position.y = 7.2;
+  cvLabel.scale.set(9, 2.25, 1);
+  cvLabel.position.y = 6.6;
   cvGroup.add(cvLabel);
   scene.add(cvGroup);
 
-  const finish = decal('FINISH', 16, 4, '#1d2430');
-  finish.position.set(0, 0.04, cvPos.z + 13);
-  scene.add(finish);
-
-  // --- Playground --------------------------------------------------------
-  const PLAY = { x: -55, z: 6 };
+  /* --------------------------------------------------------- playground */
 
   // A wall to smash
   const brickMat = new THREE.MeshStandardMaterial({ color: 0xc4543a, roughness: 0.85 });
@@ -508,40 +620,46 @@ export function buildWorld(
   ramp.rotation.x = -0.26;
   addStatic(ramp, new CANNON.Box(new CANNON.Vec3(6, 0.4, 8)), rampQuat);
 
-  const jump = decal('JUMP', 10, 3, '#1d2430');
-  jump.position.set(PLAY.x, 0.04, PLAY.z + 46);
-  scene.add(jump);
-
-  const playSign = decal('PLAYGROUND', 26, 4.4, '#1d2430');
-  playSign.position.set(PLAY.x, 0.04, PLAY.z + 56);
-  scene.add(playSign);
+  sign('JUMP', 10, PLAY.x, PLAY.z + 46);
+  sign('PLAYGROUND', 26, PLAY.x, PLAY.z + 58);
 
   /* ----------------------------------------------------------- lifecycle */
 
   let started = false;
-  let scoring = false;
 
   const start = () => {
     if (started) return;
     started = true;
     // Rain the props in, staggered, so the world assembles itself on entry.
-    props.forEach((p, i) => setTimeout(() => p.body.wakeUp(), 300 + i * 24));
-
-    // Nothing counts until everything has landed: a prop is far from its mark
-    // for the whole fall, so scoring early marks all of them knocked at once.
-    // Latch each home to wherever it actually came to rest.
-    setTimeout(() => {
-      for (const p of props) p.home.copy(p.body.position);
-      scoring = true;
-    }, 300 + props.length * 24 + 1400);
+    props.forEach((p, i) =>
+      setTimeout(() => {
+        p.body.wakeUp();
+        p.woken = true;
+      }, 300 + i * 24)
+    );
   };
 
+  /**
+   * Scoring is per-prop, not on a global timer. A prop counts once it has
+   * fallen asleep somewhere and later been shoved off that spot. Anything
+   * global mis-fires: a body has zero velocity for the first frames after
+   * wakeUp too, so a "has the world gone quiet" check can latch a prop's home
+   * while it is still in mid-air.
+   */
   const score = () => {
     let knocked = 0;
     for (const p of props) {
-      if (scoring && !p.knocked && p.body.position.distanceTo(p.home) > 1.6) {
-        p.knocked = true;
+      if (!p.woken) continue;
+
+      if (!p.settled) {
+        if (p.body.sleepState === CANNON.Body.SLEEPING) {
+          p.home.copy(p.body.position);
+          p.settled = true;
+        }
+        continue;
       }
+
+      if (!p.knocked && p.body.position.distanceTo(p.home) > 1.6) p.knocked = true;
       if (p.knocked) knocked++;
     }
     return { knocked, total: props.length };
@@ -558,5 +676,5 @@ export function buildWorld(
     }
   };
 
-  return { boards, sun, cv: { position: cvPos, radius: 7 }, score, update, start };
+  return { boards, sun, blockers, cv: { position: cvPos, radius: 7 }, score, update, start };
 }

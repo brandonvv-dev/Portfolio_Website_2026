@@ -73,7 +73,13 @@ async function boot() {
   const textures = new THREE.TextureLoader(manager);
   const gltf = new GLTFLoader(manager);
 
-  const bits = buildWorld(scene, world, groundMaterial, textures);
+  const bits = buildWorld(
+    scene,
+    world,
+    groundMaterial,
+    textures,
+    renderer.capabilities.getMaxAnisotropy()
+  );
   const model = await loadCarModel(CAR_MODEL, gltf);
   const car = new Car(world, carMaterial, model);
   car.addTo(scene);
@@ -195,6 +201,9 @@ async function boot() {
   const yawEuler = new THREE.Euler(0, 0, 0, 'YXZ');
   const yawQuat = new THREE.Quaternion();
   const offset = new THREE.Vector3();
+  const camDir = new THREE.Vector3();
+  const camFrom = new THREE.Vector3();
+  const caster = new THREE.Raycaster();
 
   // Manual clock: THREE.Clock is deprecated in r186.
   let last = performance.now();
@@ -256,6 +265,19 @@ async function boot() {
         .applyQuaternion(yawQuat)
         .add(pos);
 
+      // Camera collision: without it, backing into a billboard puts the view
+      // inside its frame and the screen fills with the back of a board.
+      camFrom.copy(pos).setY(pos.y + 1.2);
+      camDir.copy(offset).sub(camFrom);
+      const reach = camDir.length();
+      camDir.divideScalar(reach);
+      caster.set(camFrom, camDir);
+      caster.far = reach;
+      const blocked = caster.intersectObjects(bits.blockers, false)[0];
+      if (blocked) {
+        offset.copy(camFrom).addScaledVector(camDir, Math.max(3, blocked.distance - 0.8));
+      }
+
       const k = 1 - Math.pow(0.0015, dt);
       camTarget.lerp(offset, k);
       camera.position.copy(camTarget);
@@ -275,12 +297,18 @@ async function boot() {
       bits.sun.target.position.copy(pos);
       bits.sun.target.updateMatrixWorld();
 
-      // Proximity: whichever board the car is standing on wins
+      // Proximity: whichever pad the car is standing on wins. Pads are yawed
+      // (the roundabout and courtyard ones face inward), so the offset is
+      // rotated into pad-local space before the extents are compared.
       let near: Board | null = null;
       for (const board of bits.boards) {
+        const dx = pos.x - board.position.x;
+        const dz = pos.z - board.position.z;
+        const c = Math.cos(board.yaw);
+        const sn = Math.sin(board.yaw);
         if (
-          Math.abs(pos.x - board.position.x) < board.half.x &&
-          Math.abs(pos.z - board.position.z) < board.half.z
+          Math.abs(dx * c - dz * sn) < board.half.x &&
+          Math.abs(dx * sn + dz * c) < board.half.z
         ) {
           near = board;
           break;

@@ -159,7 +159,7 @@ export class Car {
     world: CANNON.World,
     bodyMaterial: CANNON.Material,
     model: CarModel,
-    spawn = new CANNON.Vec3(0, 1.6, 34)
+    spawn = new CANNON.Vec3(0, 1.6, 112)
   ) {
     this.spawn = spawn;
     this.wheels = model.wheels;
