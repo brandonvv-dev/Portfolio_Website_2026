@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { sites, type Site } from '../data/sites';
 import type { PropLibrary } from './props';
-import { dressWorld, type Spot } from './dressing';
+import { dressWorld, labelBlock, type Spot } from './dressing';
+import { createSky, DAY, NIGHT } from './sky';
+import { stabilise } from './solver';
 
 export type { Spot };
 
@@ -29,6 +31,15 @@ interface Prop {
   knocked: boolean;
 }
 
+/** Something hidden that the player can find by exploring. */
+export interface Secret {
+  id: string;
+  label: string;
+  position: THREE.Vector3;
+  radius: number;
+  found: boolean;
+}
+
 export interface WorldBits {
   boards: Board[];
   /** Drive-on pads that link out: Axiom, LinkedIn, GitHub, email. */
@@ -36,12 +47,26 @@ export interface WorldBits {
   /** Kicks off the Axiom demo reel; needs a user gesture. */
   playVideo: () => void;
   sun: THREE.DirectionalLight;
+  /**
+   * Unit vector towards the sun. The shadow frustum has to be re-hung over
+   * the car every frame, and it must be hung along this or the shadows stop
+   * agreeing with the sky they came from.
+   */
+  sunDir: THREE.Vector3;
   /** Solid things the chase camera must not end up behind. */
   blockers: THREE.Object3D[];
   cv: { position: THREE.Vector3; radius: number };
+  /** Named places the car can be put back to, nearest-first on reset. */
+  respawns: { name: string; position: THREE.Vector3; yaw: number }[];
+  /** Tucked-away spots that only turn up if you go looking. */
+  secrets: Secret[];
   /** How many props have been shoved off their mark, and how many exist. */
   score: () => { knocked: number; total: number };
-  update: (elapsed: number) => void;
+  /** Day to night: sun, sky, fog and the lit signage all move together. */
+  setNight: (on: boolean) => void;
+  /** Lower-cost mode for phones and weak GPUs. */
+  setQuality: (level: 'high' | 'low') => void;
+  update: (elapsed: number, carPos?: THREE.Vector3) => void;
   /** Rains the props in from the sky, staggered, once the player starts. */
   start: () => void;
 }
@@ -57,7 +82,14 @@ const POSTER_W = 11;
  * pyramid detonates on landing and there is nothing left to knock over.
  */
 const DROP = 3.5;
-const SKY = 0xcfe0f2;
+
+/**
+ * Fog per metre. At this arena's 260x300 the far wall sits at roughly 0.45
+ * haze, so distance reads without the near zones going milky.
+ */
+const FOG_DENSITY = 0.0022;
+/** Weak hardware draws less, and thicker haze covers the shorter draw. */
+const FOG_DENSITY_LOW = 0.0042;
 
 /**
  * Where each zone sits. The avenue runs -Z from the start plaza.
@@ -134,13 +166,31 @@ function decal(text: string, width: number, height: number, color = '#ffffff') {
   return mesh;
 }
 
-/** Light tarmac with a faint grid, generated rather than downloaded. */
+/**
+ * Light tarmac with a faint grid, generated rather than downloaded.
+ *
+ * The mottling matters more than it looks like it should: a perfectly flat
+ * colour under a single directional light reads as untextured plastic, and no
+ * amount of shadow map resolution fixes that. Dirtying it a little is what
+ * makes the ground look painted.
+ */
 function groundTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 256;
   const ctx = c.getContext('2d')!;
   ctx.fillStyle = '#9aa0ab';
   ctx.fillRect(0, 0, 256, 256);
+
+  for (let i = 0; i < 900; i++) {
+    const x = Math.random() * 256;
+    const y = Math.random() * 256;
+    const r = 2 + Math.random() * 11;
+    ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(40,46,56,0.05)';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   ctx.strokeStyle = 'rgba(255,255,255,0.28)';
   ctx.lineWidth = 3;
   ctx.strokeRect(0, 0, 256, 256);
@@ -152,29 +202,6 @@ function groundTexture() {
   return tex;
 }
 
-/** Vertical gradient sky on an inverted sphere. */
-function addSky(scene: THREE.Scene) {
-  const c = document.createElement('canvas');
-  c.width = 2;
-  c.height = 256;
-  const ctx = c.getContext('2d')!;
-  const g = ctx.createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0, '#4d7fb8');
-  g.addColorStop(0.5, '#a8c6e4');
-  g.addColorStop(1, '#dfe8f2');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 2, 256);
-
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-
-  const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(520, 24, 16),
-    new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false })
-  );
-  scene.add(sky);
-}
-
 /* -------------------------------------------------------------------- build */
 
 export function buildWorld(
@@ -183,11 +210,56 @@ export function buildWorld(
   groundMaterial: CANNON.Material,
   loader: THREE.TextureLoader,
   lib: PropLibrary,
+  // The sky bakes an environment map and samples its own horizon, both of
+  // which are GPU work, so the world needs the renderer now.
+  renderer: THREE.WebGLRenderer,
   maxAnisotropy = 8
 ): WorldBits {
   const props: Prop[] = [];
   const spinners: { mesh: THREE.Object3D; speed: number; bob: number }[] = [];
   const blockers: THREE.Object3D[] = [];
+  const secrets: Secret[] = [];
+  const respawns: { name: string; position: THREE.Vector3; yaw: number }[] = [];
+  /** Constraint-driven bodies: the seesaw and the wrecking ball. */
+  const dynamics: { mesh: THREE.Object3D; body: CANNON.Body }[] = [];
+
+  /**
+   * Objects that fade in as the car approaches.
+   *
+   * Showing everything at full strength from anywhere turns the arena into a
+   * wall of competing signage; revealing a board's detail only once you are
+   * near it is what makes the place read as somewhere you move through rather
+   * than a menu laid out flat.
+   */
+  const fades: {
+    obj: THREE.Object3D;
+    mats: THREE.Material[];
+    near: number;
+    far: number;
+    /** Scale up on approach as well as fade in. */
+    pop: boolean;
+    /** Authored scale, kept whole: sprites here are not square. */
+    base: THREE.Vector3;
+    shown: number;
+  }[] = [];
+
+  const registerFade = (obj: THREE.Object3D, near: number, far: number, pop = false) => {
+    const mats: THREE.Material[] = [];
+    obj.traverse((o) => {
+      const m = (o as THREE.Mesh).material;
+      if (!m) return;
+      for (const mat of Array.isArray(m) ? m : [m]) {
+        mat.transparent = true;
+        // Fading geometry cannot claim the depth buffer, or whatever is behind
+        // it disappears for the frames where it is half-there.
+        mat.depthWrite = false;
+        mats.push(mat);
+      }
+    });
+    if (!mats.length) return;
+    obj.visible = false;
+    fades.push({ obj, mats, near, far, pop, base: obj.scale.clone(), shown: 0 });
+  };
 
   /**
    * Adds a prop parked in the sky above `rest`, held asleep until start().
@@ -213,7 +285,9 @@ export function buildWorld(
       position: new CANNON.Vec3(rest[0], rest[1] + DROP, rest[2]),
     });
     body.updateAABB();
-    body.allowSleep = true;
+    // Sleep thresholds tuned for stacking: cannon's defaults let a pyramid
+    // creep for a full second before settling, and it unstacks itself.
+    stabilise(body);
     body.sleep();
     world.addBody(body);
 
@@ -250,12 +324,32 @@ export function buildWorld(
   };
 
   // --- Sky, light, fog ---------------------------------------------------
-  addSky(scene);
-  scene.fog = new THREE.Fog(SKY, 130, 420);
-  scene.add(new THREE.HemisphereLight(0xdfeaff, 0x6b7280, 2.2));
+
+  // Scattering model, the environment light baked off it, and the horizon
+  // colour sampled from it. See sky.ts for why those three travel together.
+  const sky = createSky(scene, renderer);
+
+  /**
+   * Exponential fog, not linear.
+   *
+   * Real distance haze accumulates per metre, so contrast falls away smoothly
+   * from the very first metre; linear near/far switches the effect on at a
+   * plane, which is why the far side of the arena used to look like it had
+   * weather rather than distance. The colour comes off the sky itself, so
+   * distant trees dissolve into the horizon instead of standing against it.
+   */
+  scene.fog = new THREE.FogExp2(sky.horizon.getHex(), FOG_DENSITY);
+
+  // Deliberately small. With `scene.environment` carrying the sky, a
+  // hemisphere light at its old 2.2 is counting the same bounce twice and
+  // flattens everything it touches. This is a nudge in the shadows, no more.
+  const hemi = new THREE.HemisphereLight(0xdfeaff, 0x6b7280, 0.3);
+  scene.add(hemi);
 
   const sun = new THREE.DirectionalLight(0xfff4e2, 2.6);
-  sun.position.set(40, 60, 30);
+  // Aimed from wherever the sky says the sun is, so the shadows and the bright
+  // patch of sky finally agree with each other.
+  sun.position.copy(sky.sunDirection).multiplyScalar(90);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 1;
@@ -491,6 +585,21 @@ export function buildWorld(
       group.add(leg);
     }
 
+    // The content itself, standing in the world rather than in a DOM panel:
+    // a plate that only appears once you are close enough for it to be about
+    // the thing you are standing on.
+    const pylon = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: labelTexture(site.name, `Site ${String(site.num).padStart(2, '0')} of 20`),
+        transparent: true,
+        depthTest: false,
+      })
+    );
+    pylon.scale.set(10, 2.5, 1);
+    pylon.position.set(0, 1.4 + POSTER_W * 0.625 + 2.4, back);
+    group.add(pylon);
+    registerFade(pylon, 30, 62, true);
+
     scene.add(group);
     boards.push({
       site,
@@ -648,22 +757,398 @@ export function buildWorld(
   //      edge up instead and the surface you actually drive on still starts
   //      0.8m in the air, which a 0.36m wheel cannot climb. The nose of the
   //      wedge ends up buried, which is exactly how a ramp should sit.
-  const RAMP = { tilt: 0.16, halfZ: 9, halfY: 0.4 };
-  const rampY =
-    0.02 - (RAMP.halfY * Math.cos(RAMP.tilt) - RAMP.halfZ * Math.sin(RAMP.tilt));
+  const rampMat = new THREE.MeshStandardMaterial({ color: 0x3f4756, roughness: 0.75 });
+  const HALF_Y = 0.4;
 
-  const rampQuat = new CANNON.Quaternion();
-  rampQuat.setFromEuler(RAMP.tilt, 0, 0);
-  const ramp = new THREE.Mesh(
-    new THREE.BoxGeometry(12, RAMP.halfY * 2, RAMP.halfZ * 2),
-    new THREE.MeshStandardMaterial({ color: 0x3f4756, roughness: 0.75 })
-  );
-  ramp.position.set(PLAY.x, rampY, PLAY.z + 30);
-  ramp.rotation.x = RAMP.tilt;
-  addStatic(ramp, new CANNON.Box(new CANNON.Vec3(6, RAMP.halfY, RAMP.halfZ)), rampQuat);
+  /**
+   * A wedge you can actually drive up, rising towards -Z from a leading edge
+   * that sits flush with the floor at +Z. `rise` is how high the far end ends
+   * up, which is the only number worth thinking in.
+   */
+  const wedge = (x: number, z: number, width: number, run: number, rise: number) => {
+    const halfZ = run / 2;
+    const tilt = Math.asin(Math.min(0.6, rise / run));
+    const y = 0.02 - (HALF_Y * Math.cos(tilt) - halfZ * Math.sin(tilt));
+
+    const quat = new CANNON.Quaternion();
+    quat.setFromEuler(tilt, 0, 0);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, HALF_Y * 2, run), rampMat);
+    mesh.position.set(x, y, z);
+    mesh.rotation.x = tilt;
+    addStatic(mesh, new CANNON.Box(new CANNON.Vec3(width / 2, HALF_Y, halfZ)), quat);
+    return mesh;
+  };
+
+  /**
+   * A curved take-off, approximated by tilted slabs along an arc. A wedge
+   * throws the car at a fixed angle whatever the entry speed; a curve loads
+   * it progressively, so slow is a roll-over and fast is a launch.
+   *
+   * Segment `t` sits on the arc with its top face on the curve and its local
+   * +Z along the tangent, which a rotation of exactly `t` about X gives.
+   */
+  const quarterPipe = (
+    x: number,
+    z0: number,
+    radius: number,
+    sweep: number,
+    width: number,
+    segments = 7
+  ) => {
+    const step = sweep / segments;
+    const len = radius * step * 1.06; // overlap slightly, or the seams catch a wheel
+    for (let i = 0; i < segments; i++) {
+      const t = (i + 0.5) * step;
+      const py = radius - radius * Math.cos(t) - (HALF_Y * Math.cos(t));
+      const pz = z0 - radius * Math.sin(t) - HALF_Y * Math.sin(t);
+
+      const quat = new CANNON.Quaternion();
+      quat.setFromEuler(t, 0, 0);
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, HALF_Y * 2, len), rampMat);
+      mesh.position.set(x, py, pz);
+      mesh.rotation.x = t;
+      addStatic(mesh, new CANNON.Box(new CANNON.Vec3(width / 2, HALF_Y, len / 2)), quat);
+    }
+  };
+
+  /** A plain static block: walls, roofs, gantries, maze. */
+  const slab = (
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    h: number,
+    d: number,
+    material: THREE.Material,
+    block = false
+  ) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+    mesh.position.set(x, y, z);
+    addStatic(mesh, new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2)));
+    if (block) blockers.push(mesh);
+    return mesh;
+  };
+
+  wedge(PLAY.x, PLAY.z + 30, 12, 18, 2.9);
+  // A short steep kicker beside it: same approach, very different landing.
+  wedge(PLAY.x + 20, PLAY.z + 30, 8, 9, 2.6);
+  // And a curved one, for the big air.
+  quarterPipe(PLAY.x - 22, PLAY.z + 34, 15, 0.95, 12);
 
   sign('JUMP', 10, PLAY.x, PLAY.z + 46);
+  sign('KICKER', 9, PLAY.x + 20, PLAY.z + 42);
+  sign('THE CURVE', 12, PLAY.x - 22, PLAY.z + 48);
   sign('PLAYGROUND', 26, PLAY.x, PLAY.z + 58);
+
+  /* -------------------------------------------------------- moving toys */
+
+  // A domino run, curving so the fall is worth watching to the end.
+  const dominoMat = new THREE.MeshStandardMaterial({ color: 0xe8eaef, roughness: 0.5 });
+  for (let i = 0; i < 20; i++) {
+    const a = (i / 19) * Math.PI * 0.9;
+    const dx = PLAY.x - 26 + Math.cos(a) * 13;
+    const dz = PLAY.z - 2 + Math.sin(a) * 13;
+    const tile = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.6, 0.3), dominoMat);
+    tile.rotation.y = -a;
+    addProp(tile, new CANNON.Box(new CANNON.Vec3(0.75, 1.3, 0.15)), [dx, 1.3, dz], 1.3);
+  }
+
+  // Seesaw: a plank on a hinge. Drive up one end, the other comes down.
+  const fulcrumMat = new THREE.MeshStandardMaterial({ color: 0x5b6474, roughness: 0.7 });
+  // North of the west spur on purpose: the plank is 15m long, and centred on
+  // the road it reaches across the lane you arrive down.
+  const SEE = { x: PLAY.x + 34, z: PLAY.z + 20 };
+  slab(SEE.x, 0.5, SEE.z, 5.4, 1, 1.6, fulcrumMat);
+
+  const fulcrum = new CANNON.Body({
+    mass: 0,
+    shape: new CANNON.Box(new CANNON.Vec3(2.7, 0.5, 0.8)),
+    material: groundMaterial,
+    position: new CANNON.Vec3(SEE.x, 0.5, SEE.z),
+  });
+  fulcrum.updateAABB();
+  world.addBody(fulcrum);
+
+  const plankMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(5, 0.3, 15),
+    new THREE.MeshStandardMaterial({ color: 0xb98a4e, roughness: 0.8 })
+  );
+  plankMesh.castShadow = true;
+  plankMesh.receiveShadow = true;
+  scene.add(plankMesh);
+
+  const plank = new CANNON.Body({
+    mass: 45,
+    shape: new CANNON.Box(new CANNON.Vec3(2.5, 0.15, 7.5)),
+    material: groundMaterial,
+    position: new CANNON.Vec3(SEE.x, 1.15, SEE.z),
+  });
+  plank.updateAABB();
+  plank.allowSleep = false;
+  world.addBody(plank);
+  world.addConstraint(
+    new CANNON.HingeConstraint(plank, fulcrum, {
+      pivotA: new CANNON.Vec3(0, 0, 0),
+      axisA: new CANNON.Vec3(1, 0, 0),
+      pivotB: new CANNON.Vec3(0, 0.65, 0),
+      axisB: new CANNON.Vec3(1, 0, 0),
+    })
+  );
+  dynamics.push({ mesh: plankMesh, body: plank });
+  sign('SEESAW', 10, SEE.x, SEE.z + 13);
+
+  // Wrecking ball. Hung from a gantry on a point constraint, which is the
+  // whole rope: one rigid link swings exactly like a pendulum.
+  const BALL = { x: PLAY.x + 34, z: PLAY.z - 22 };
+  const gantryMat = new THREE.MeshStandardMaterial({
+    color: 0x8a94a6,
+    metalness: 0.5,
+    roughness: 0.45,
+  });
+  for (const side of [-1, 1]) {
+    slab(BALL.x + side * 7, 6, BALL.z, 1.2, 12, 1.2, gantryMat, true);
+  }
+  slab(BALL.x, 12.4, BALL.z, 15.2, 0.8, 1.2, gantryMat, true);
+
+  const ballMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(1.7, 22, 16),
+    new THREE.MeshStandardMaterial({ color: 0x2b313c, metalness: 0.6, roughness: 0.35 })
+  );
+  ballMesh.castShadow = true;
+  scene.add(ballMesh);
+
+  const ball = new CANNON.Body({
+    mass: 55,
+    shape: new CANNON.Sphere(1.7),
+    material: groundMaterial,
+    position: new CANNON.Vec3(BALL.x, 4.4, BALL.z),
+  });
+  ball.updateAABB();
+  ball.allowSleep = false;
+  ball.linearDamping = 0.06;
+  world.addBody(ball);
+
+  const anchor = new CANNON.Body({
+    mass: 0,
+    position: new CANNON.Vec3(BALL.x, 12, BALL.z),
+  });
+  world.addBody(anchor);
+  world.addConstraint(
+    new CANNON.PointToPointConstraint(
+      ball,
+      new CANNON.Vec3(0, 7.6, 0),
+      anchor,
+      new CANNON.Vec3(0, 0, 0)
+    )
+  );
+
+  const rope = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(BALL.x, 12, BALL.z),
+      new THREE.Vector3(BALL.x, 4.4, BALL.z),
+    ]),
+    new THREE.LineBasicMaterial({ color: 0x1d2230 })
+  );
+  scene.add(rope);
+  sign('WRECKING BALL', 16, BALL.x, BALL.z + 12);
+
+  /* ------------------------------------------------ letters you can flatten */
+
+  /**
+   * Word-sized physics blocks. One body per letter, with the glyph painted on
+   * the faces: a letter built out of little cubes looks better standing up and
+   * costs forty bodies to knock down.
+   */
+  const word = (
+    text: string,
+    cx: number,
+    z: number,
+    colour: string,
+    size = { w: 3, h: 4.2, d: 1.4 }
+  ) => {
+    const gap = size.w + 0.5;
+    const start = cx - ((text.length - 1) * gap) / 2;
+    [...text].forEach((ch, i) => {
+      if (ch === ' ') return;
+      addProp(
+        labelBlock(ch, colour, size.w, size.h, size.d),
+        new CANNON.Box(new CANNON.Vec3(size.w / 2, size.h / 2, size.d / 2)),
+        [start + i * gap, size.h / 2, z],
+        3
+      );
+    });
+  };
+
+  word('BRANDON', 0, 127, '#2997ff');
+  word('HIRE ME', 0, CV_Z - 15, '#f0b429');
+
+  /* --------------------------------------------------- tunnel and rooftop */
+
+  // A drive-through with a drivable roof. The ramp up is round the back, so
+  // the roof is only reachable if you go looking for it.
+  const TUN = { x: -90, z: -70 };
+  const concrete = new THREE.MeshStandardMaterial({ color: 0xb9bec8, roughness: 0.9 });
+
+  for (const side of [-1, 1]) {
+    slab(TUN.x + side * 8, 2.5, TUN.z, 2, 5, 34, concrete, true);
+  }
+  slab(TUN.x, 5.3, TUN.z, 18, 0.6, 34, concrete);
+  // Up onto the roof from the +Z end. The wedge rises towards -Z, so its high
+  // edge lands at centre minus half the run: that has to equal the roof edge,
+  // or you arrive at roof height with a gap still to clear.
+  wedge(TUN.x, TUN.z + 28, 10, 22, 5.6);
+  sign('TUNNEL', 14, TUN.x, TUN.z + 26);
+
+  const lookout = new THREE.Mesh(
+    new THREE.TorusGeometry(1.6, 0.36, 10, 26),
+    new THREE.MeshStandardMaterial({
+      color: 0xf0b429,
+      emissive: 0xf0b429,
+      emissiveIntensity: 0.7,
+      roughness: 0.3,
+    })
+  );
+  lookout.position.set(TUN.x, 7.4, TUN.z - 8);
+  scene.add(lookout);
+  spinners.push({ mesh: lookout, speed: 1.4, bob: 7.4 });
+  secrets.push({
+    id: 'rooftop',
+    label: 'The roof of the tunnel',
+    position: new THREE.Vector3(TUN.x, 5.6, TUN.z - 8),
+    radius: 7,
+    found: false,
+  });
+
+  /* ------------------------------------------------------------- the maze */
+
+  // Deliberately short. A maze you can see over is a detour, which is what
+  // this wants to be; a maze you get lost in is somewhere people quit.
+  const MAZE = { x: 90, z: -80 };
+  const hedge = new THREE.MeshStandardMaterial({ color: 0x6f9464, roughness: 0.95 });
+  /**
+   * A spiral, not a puzzle: one gap in the outer wall, one gap in the inner
+   * ring, offset from each other, and a baffle in the middle. Every gap is
+   * wider than the car, and there is exactly one route in, so nobody gets
+   * stuck in here and gives up on the rest of the world.
+   */
+  const walls: [number, number, number, number][] = [
+    // [offset x, offset z, width, depth]
+    [-10.5, 18, 15, 1.4], // south wall, west half
+    [13.5, 18, 9, 1.4], //  south wall, east half — the way in is between them
+    [0, -18, 36, 1.4],
+    [-18, 0, 1.4, 36],
+    [18, 0, 1.4, 36],
+    [-4, 10, 12, 1.4], // inner ring, south side, open at its east end
+    [10, 0, 1.4, 22],
+    [0, -10, 22, 1.4],
+    [-10, 0, 1.4, 22],
+    [0, 4, 12, 1.4], // baffle, so the last stretch is not a straight run
+  ];
+  for (const [ox, oz, w, d] of walls) {
+    slab(MAZE.x + ox, 1.6, MAZE.z + oz, w, 3.2, d, hedge, true);
+  }
+  sign('MAZE  ▲', 14, MAZE.x + 3, MAZE.z + 24);
+
+  const trophy = new THREE.Mesh(
+    new THREE.OctahedronGeometry(1.5),
+    new THREE.MeshStandardMaterial({
+      color: 0x2997ff,
+      emissive: 0x2997ff,
+      emissiveIntensity: 0.8,
+      roughness: 0.25,
+    })
+  );
+  trophy.position.set(MAZE.x, 2.4, MAZE.z - 3);
+  scene.add(trophy);
+  spinners.push({ mesh: trophy, speed: 1.1, bob: 2.4 });
+  secrets.push({
+    id: 'maze',
+    label: 'The heart of the maze',
+    position: new THREE.Vector3(MAZE.x, 0, MAZE.z - 3),
+    radius: 5,
+    found: false,
+  });
+
+  /* ---------------------------------------------------------- skate park */
+
+  const SKATE = { x: 92, z: 96 };
+  quarterPipe(SKATE.x, SKATE.z + 16, 16, 1.05, 22, 8);
+  quarterPipe(SKATE.x - 30, SKATE.z + 16, 11, 1.15, 16, 7);
+  wedge(SKATE.x + 26, SKATE.z + 14, 10, 14, 3.4);
+  sign('SKATE PARK', 26, SKATE.x, SKATE.z + 34);
+
+  const beacon = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(1.4),
+    new THREE.MeshStandardMaterial({
+      color: 0x34d399,
+      emissive: 0x34d399,
+      emissiveIntensity: 0.8,
+      roughness: 0.3,
+    })
+  );
+  beacon.position.set(SKATE.x, 9, SKATE.z - 6);
+  scene.add(beacon);
+  spinners.push({ mesh: beacon, speed: 1.6, bob: 9 });
+  secrets.push({
+    id: 'skate',
+    label: 'Over the big curve',
+    position: new THREE.Vector3(SKATE.x, 0, SKATE.z - 6),
+    radius: 8,
+    found: false,
+  });
+
+  /* ------------------------------------------------- the trail to follow */
+
+  /**
+   * Chevrons dropped along a polyline. Without a painted route people drive
+   * into the empty corners of the arena and conclude there is nothing here;
+   * with one, every zone is on a path from the last.
+   */
+  const route = (points: [number, number][], colour = '#2997ff', spacing = 9) => {
+    for (let i = 0; i < points.length - 1; i++) {
+      const [x0, z0] = points[i];
+      const [x1, z1] = points[i + 1];
+      const dx = x1 - x0;
+      const dz = z1 - z0;
+      const len = Math.hypot(dx, dz);
+      const steps = Math.max(1, Math.round(len / spacing));
+      const yaw = Math.atan2(dx, dz);
+      for (let s = 0; s < steps; s++) {
+        const k = (s + 0.5) / steps;
+        const chevron = decal('▲', 2.6, 2.6, colour);
+        chevron.position.set(x0 + dx * k, 0.05, z0 + dz * k);
+        // decal() lies in the XZ plane already; rotateZ steers it in place.
+        chevron.rotateZ(-(yaw + Math.PI));
+        scene.add(chevron);
+        registerFade(chevron, 26, 58);
+      }
+    }
+  };
+
+  route([
+    [6, 110],
+    [6, 34],
+    [6, -6],
+    [ROUNDABOUT.x + 14, ROUNDABOUT.z + 34],
+    [ROUNDABOUT.x + 8, ROUNDABOUT.z - 36],
+    [0, CV_Z + 30],
+  ]);
+  route([[-8, 28], [-40, 28], [PLAY.x + 16, 30]], '#34d399');
+  route([[8, 28], [40, 28], [COURTYARD.x - 14, 26]], '#f0b429');
+
+  /* --------------------------------------------------- places to come back to */
+
+  respawns.push(
+    { name: 'the start', position: new THREE.Vector3(0, 1.6, 112), yaw: Math.PI },
+    { name: 'the avenue', position: new THREE.Vector3(0, 1.6, 60), yaw: Math.PI },
+    { name: 'the roundabout', position: new THREE.Vector3(0, 1.6, -6), yaw: Math.PI },
+    { name: 'the courtyard', position: new THREE.Vector3(56, 1.6, 26), yaw: -Math.PI / 2 },
+    { name: 'the playground', position: new THREE.Vector3(-56, 1.6, 30), yaw: Math.PI / 2 },
+    { name: 'the skate park', position: new THREE.Vector3(SKATE.x, 1.6, SKATE.z + 30), yaw: Math.PI },
+    { name: 'the tunnel', position: new THREE.Vector3(TUN.x, 1.6, TUN.z + 36), yaw: Math.PI },
+    { name: 'the maze', position: new THREE.Vector3(MAZE.x + 3, 1.6, MAZE.z + 26), yaw: Math.PI },
+    { name: 'the finish', position: new THREE.Vector3(0, 1.6, CV_Z + 22), yaw: Math.PI }
+  );
 
   /* ----------------------------------------------------- signage & scenery */
 
@@ -719,7 +1204,54 @@ export function buildWorld(
     return { knocked, total: props.length };
   };
 
-  const update = (elapsed: number) => {
+  /**
+   * Day and night are the same scene with different light. Nothing is rebuilt:
+   * the sky swaps texture, the two lights change colour and level, and the fog
+   * pulls in, which is what actually sells a night drive.
+   */
+  // Fog density is the product of two independent decisions, so both are kept
+  // rather than each overwriting the other: toggling night used to silently
+  // undo an auto-quality downgrade.
+  let isNight = false;
+  let quality: 'high' | 'low' = 'high';
+  const applyFog = () => {
+    const fog = scene.fog as THREE.FogExp2;
+    const base = quality === 'high' ? FOG_DENSITY : FOG_DENSITY_LOW;
+    // Night air is clearer to look through but there is less to see: denser
+    // haze keeps the arena edge from being a hard line against the stars.
+    fog.density = base * (isNight ? 1.5 : 1);
+  };
+
+  const setNight = (on: boolean) => {
+    isNight = on;
+    // Moving the sun below the horizon does most of the work: the shader
+    // re-scatters, the environment map is rebuilt off the darker sky and the
+    // horizon is re-sampled, so the fog matches without being told a colour.
+    const preset = on ? NIGHT : DAY;
+    sky.apply(preset);
+    renderer.toneMappingExposure = preset.exposure;
+
+    sun.position.copy(sky.sunDirection).multiplyScalar(90);
+    sun.intensity = on ? 0.32 : 2.6;
+    sun.color.set(on ? 0xa8bede : 0xfff4e2);
+    hemi.intensity = on ? 0.12 : 0.3;
+    hemi.color.set(on ? 0x2d3c5e : 0xdfeaff);
+    hemi.groundColor.set(on ? 0x0d1119 : 0x6b7280);
+
+    (scene.fog as THREE.FogExp2).color.copy(sky.horizon);
+    applyFog();
+  };
+
+  const setQuality = (level: 'high' | 'low') => {
+    quality = level;
+    sun.castShadow = level === 'high';
+    applyFog();
+  };
+
+  const ropePoints = rope.geometry.attributes.position as THREE.BufferAttribute;
+  const carToFade = new THREE.Vector3();
+
+  const update = (elapsed: number, carPos?: THREE.Vector3) => {
     for (const sp of spinners) {
       sp.mesh.rotation.y = elapsed * sp.speed;
       sp.mesh.position.y = sp.bob + Math.sin(elapsed * 1.6) * 0.25;
@@ -728,16 +1260,44 @@ export function buildWorld(
       p.mesh.position.copy(p.body.position as unknown as THREE.Vector3);
       p.mesh.quaternion.copy(p.body.quaternion as unknown as THREE.Quaternion);
     }
+    for (const d of dynamics) {
+      d.mesh.position.copy(d.body.position as unknown as THREE.Vector3);
+      d.mesh.quaternion.copy(d.body.quaternion as unknown as THREE.Quaternion);
+    }
+
+    ropePoints.setXYZ(1, ball.position.x, ball.position.y + 1.7, ball.position.z);
+    ropePoints.needsUpdate = true;
+
+    if (!carPos) return;
+    for (const f of fades) {
+      f.obj.getWorldPosition(carToFade);
+      const d = carToFade.distanceTo(carPos);
+      const want = d <= f.near ? 1 : d >= f.far ? 0 : (f.far - d) / (f.far - f.near);
+      // Ease rather than snap, so driving past an edge doesn't strobe.
+      f.shown += (want - f.shown) * 0.12;
+      const visible = f.shown > 0.01;
+      f.obj.visible = visible;
+      if (!visible) continue;
+      for (const m of f.mats) m.opacity = f.shown;
+      if (f.pop) f.obj.scale.copy(f.base).multiplyScalar(0.82 + f.shown * 0.18);
+    }
   };
+
+  setNight(false);
 
   return {
     boards,
     spots: dressing.spots,
     playVideo: dressing.playVideo,
     sun,
+    sunDir: sky.sunDirection,
     blockers,
     cv: { position: cvPos, radius: 7 },
+    respawns,
+    secrets,
     score,
+    setNight,
+    setQuality,
     update,
     start,
   };

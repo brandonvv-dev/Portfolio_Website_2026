@@ -58,7 +58,10 @@ const NO_GO: Rect[] = [
   { x0: -30, x1: -10, z0: 4, z1: 100 }, // avenue pads, west column
   { x0: 10, x1: 30, z0: 4, z1: 100 }, // avenue pads, east column
   { x0: -20, x1: 20, z0: 98, z1: 134 }, // start plaza
-  { x0: -106, x1: -56, z0: -2, z1: 64 }, // playground
+  { x0: -124, x1: -40, z0: -26, z1: 70 }, // playground, ramps and the toys
+  { x0: -112, x1: -68, z0: -110, z1: -30 }, // tunnel and its roof ramp
+  { x0: 68, x1: 112, z0: -110, z1: -46 }, // maze
+  { x0: 52, x1: 120, z0: 64, z1: 124 }, // skate park
 ];
 
 const NO_GO_DISCS: Disc[] = [
@@ -286,6 +289,32 @@ function stackTexture(name: string, color: string) {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
   return tex;
+}
+
+/**
+ * A box carrying `text` on all four upright faces and flat colour on the top
+ * and bottom. Backs both the stack blocks and the knockable letters, which
+ * want the same thing at different proportions.
+ */
+export function labelBlock(text: string, color: string, w: number, h = w, d = w) {
+  const face = new THREE.MeshStandardMaterial({
+    map: stackTexture(text, color),
+    roughness: 0.45,
+    metalness: 0.12,
+  });
+  const edge = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(color),
+    roughness: 0.55,
+  });
+  // BoxGeometry material order: +X, -X, +Y, -Y, +Z, -Z
+  return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [
+    face,
+    face,
+    edge,
+    edge,
+    face,
+    face,
+  ]);
 }
 
 export function dressWorld(ctx: DressContext): Dressing {
@@ -610,26 +639,8 @@ export function dressWorld(ctx: DressContext): Dressing {
   scene.add(screenGroup);
 
   /** A cube carrying one tool's name on all four sides. */
-  const stackBlock = (name: string, color: string, size: number) => {
-    const face = new THREE.MeshStandardMaterial({
-      map: stackTexture(name, color),
-      roughness: 0.45,
-      metalness: 0.12,
-    });
-    const edge = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(color),
-      roughness: 0.55,
-    });
-    // BoxGeometry material order: +X, -X, +Y, -Y, +Z, -Z
-    return new THREE.Mesh(new THREE.BoxGeometry(size, size, size), [
-      face,
-      face,
-      edge,
-      edge,
-      face,
-      face,
-    ]);
-  };
+  const stackBlock = (name: string, color: string, size: number) =>
+    labelBlock(name, color, size);
 
   /* --------------------------------------------------------- the scenery */
 
