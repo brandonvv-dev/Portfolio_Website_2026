@@ -54,7 +54,7 @@ const total = sites.reduce((n, s) => n + s.images.length, 0);
       <h3 data-lb-title></h3>
       <p data-lb-count></p>
     </div>
-    <a class="lb-live" data-lb-live target="_blank" rel="noopener" hidden>Visit the site &rsaquo;</a>
+    <a class="lb-live" data-lb-live target="_blank" rel="noopener" hidden>View website &rsaquo;</a>
     <button type="button" data-lb-close aria-label="Close">&times;</button>
   </header>
 
@@ -63,7 +63,7 @@ const total = sites.reduce((n, s) => n + s.images.length, 0);
 
   <footer>
     <span>Built by <a href="https://axiom-billing.vercel.app/" target="_blank" rel="noopener">Axiom</a></span>
-    <a data-lb-foot-live target="_blank" rel="noopener" hidden>Visit the site &rsaquo;</a>
+    <a class="lb-foot-live" data-lb-foot-live target="_blank" rel="noopener" hidden>View website &rsaquo;</a>
     <a href="mailto:brandon.vanvuuren60@gmail.com">Want one like this? &rsaquo;</a>
   </footer>
 </dialog>
@@ -281,11 +281,18 @@ const total = sites.reduce((n, s) => n + s.images.length, 0);
     color: var(--text-dim);
   }
   .lb-live {
+    padding: 0.5rem 0.95rem;
+    border-radius: 999px;
+    background: var(--accent);
     font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--accent);
+    font-weight: 600;
+    color: #06121f;
     text-decoration: none;
     white-space: nowrap;
+    transition: filter 0.15s ease;
+  }
+  .lb-live:hover {
+    filter: brightness(1.15);
   }
   .lb-live[hidden] {
     display: none;

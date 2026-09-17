@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import type { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { Drivetrain, applyTyreModel, type DriveState } from './drivetrain';
 
 export interface CarInput {
   /** -1 (reverse) .. 1 (full throttle) */
@@ -13,47 +12,11 @@ export interface CarInput {
   handbrake?: boolean;
 }
 
+const MAX_FORCE = 1500;
 const MAX_STEER = 0.52;
 const BRAKE_FORCE = 30;
-/**
- * Handbrake: locks the rear pair only, which is what lets the back step out.
- * Full-axle braking just stops the car in a straight line.
- */
-const HANDBRAKE_FORCE = 110;
-/**
- * What is left of the rear tyres' grip while the handbrake is pulled. Locking
- * the rear wheels alone only slows the car; taking their lateral grip away at
- * the same time is what actually lets the back swing out.
- */
-const HANDBRAKE_GRIP = 0.3;
-
-/**
- * Anti-roll bars, in newtons per unit of left-right suspension difference.
- *
- * This is the fix for a RaycastVehicle that tips over. Four independent
- * springs have nothing tying one side of the car to the other, so in a
- * corner the outer pair compresses, the inner pair extends, and nothing
- * resists the body rolling until a wheel lifts and it goes over. A real car
- * has a bar across each axle doing exactly this sum.
- *
- * Front is stiffer than rear on purpose: it pushes the balance towards
- * understeer at the limit, which is the forgiving end to be on.
- */
-const ROLL_BAR_FRONT = 2600;
-const ROLL_BAR_REAR = 1900;
-
-/**
- * Damping on roll rate specifically, rather than on all rotation.
- * `angularDamping` would bleed off yaw too, and yaw is the drift.
- */
-const ROLL_DAMP = 240;
-/**
- * Aerodynamic drag and rolling resistance. Together these give the car a top
- * speed that arrives gradually and a coast-down that feels like mass, rather
- * than the old hard clamp at a magic number.
- */
-const DRAG = 2.2;
-const ROLLING = 14;
+/** Speed limiter (km/h). Uncapped this thing reaches 150+ and is undriveable. */
+const MAX_KMH = 78;
 /** Every model is rescaled to this nose-to-tail length, so swaps stay drivable. */
 const TARGET_LENGTH = 4;
 
@@ -72,21 +35,11 @@ const TARGET_LENGTH = 4;
  * The car spawns yawed 180 degrees so its nose points down the avenue.
  */
 const SPAWN_YAW = Math.PI;
-const DRAG_F = new CANNON.Vec3();
 const UP = new CANNON.Vec3(0, 1, 0);
 
-// Scratch values for the per-frame getters below. Allocating a Vec3 inside a
-// getter that four systems read every frame is the cheapest garbage there is
-// to avoid making.
+/** Scratch, so reading the car's state every frame allocates nothing. */
 const LOCAL_VEL = new CANNON.Vec3();
 const INV_QUAT = new CANNON.Quaternion();
-const YAW_EULER = new THREE.Euler(0, 0, 0, 'YXZ');
-const ROLL_FORCE = new CANNON.Vec3();
-const ROLL_POINT = new CANNON.Vec3();
-const ROLL_AXIS = new CANNON.Vec3();
-const ROLL_TORQUE = new CANNON.Vec3();
-/** The car's own forward axis, for isolating roll from yaw and pitch. */
-const FORWARD = new CANNON.Vec3(0, 0, 1);
 
 export interface CarModel {
   /** Hull, already rotated nose-to-+Z, scaled, and centred on the axle plane. */
@@ -205,19 +158,6 @@ export class Car {
 
   private wheels: THREE.Object3D[];
   private brakeLights: THREE.MeshStandardMaterial;
-  private headlightMat!: THREE.MeshStandardMaterial;
-  private beams: THREE.SpotLight[] = [];
-  private lightsOn = false;
-  private drivetrain!: Drivetrain;
-  private baseSlip = 1.6;
-  private lastDrive: DriveState = {
-    force: 0,
-    rev: 0,
-    rpm: 900,
-    gear: 1,
-    shifting: false,
-    load: 0,
-  };
   private steerValue = 0;
   private spawn: CANNON.Vec3;
 
@@ -235,17 +175,12 @@ export class Car {
     // Half-height and lift stay fixed: they are tuned so the hull clears the
     // floor without the belly grounding out, whichever model is loaded.
     const shape = new CANNON.Box(new CANNON.Vec3(model.half.w, 0.32, model.half.l));
-    // Light on purpose. At 170kg with stiff springs the car railed like a
-    // simulator; at 110 it leans into a corner, slides when provoked and can
-    // be shoved around by the props, which is the whole point of the place.
-    this.body = new CANNON.Body({ mass: 110, material: bodyMaterial });
+    this.body = new CANNON.Body({ mass: 170, material: bodyMaterial });
     this.body.addShape(shape, new CANNON.Vec3(0, 0.22, 0));
     this.body.position.copy(spawn);
     this.body.quaternion.setFromAxisAngle(UP, SPAWN_YAW);
-    // Deliberately light, because roll is damped on its own axis in
-    // dampRoll(). Damping everything equally is what makes a car feel like it
-    // is turning in treacle: the yaw has to stay free for a drift to rotate.
-    this.body.angularDamping = 0.14;
+    // Keeps the car from tipping onto its roof at the first hard corner
+    this.body.angularDamping = 0.35;
     // The world allows sleeping (cheap for the props), but a sleeping chassis
     // ignores applyEngineForce, so the car would never pull away.
     this.body.allowSleep = false;
@@ -261,23 +196,14 @@ export class Car {
       radius: model.wheelRadius,
       directionLocal: new CANNON.Vec3(0, -1, 0),
       axleLocal: new CANNON.Vec3(-1, 0, 0),
-      // Soft and long-travel: visible body bounce over a kerb is most of what
-      // separates a toy car from a physics demo.
-      // Firmer than the soft setup that preceded it. Long, soft travel looked
-      // great over a kerb but let the body keep rolling well past the point
-      // the tyres had given up, which is where it went over.
       suspensionStiffness: 34,
-      suspensionRestLength: 0.33,
-      // Grip low enough to break traction under power or a flick of the wheel.
-      frictionSlip: 1.6,
-      dampingRelaxation: 2.6,
-      dampingCompression: 4.2,
+      suspensionRestLength: 0.32,
+      frictionSlip: 2.4,
+      dampingRelaxation: 2.4,
+      dampingCompression: 4.4,
       maxSuspensionForce: 100000,
-      // cannon applies the tyre's lateral force this far up towards the roll
-      // axis. It is the single most direct tipping control there is, and 0.06
-      // was enough to lever the car over on a hard direction change.
-      rollInfluence: 0.015,
-      maxSuspensionTravel: 0.36,
+      rollInfluence: 0.02,
+      maxSuspensionTravel: 0.3,
       customSlidingRotationalSpeed: -30,
       useCustomSlidingRotationalSpeed: true,
     };
@@ -291,10 +217,7 @@ export class Car {
     }
 
     // Wheel grip comes from frictionSlip above, not from contact materials:
-    // RaycastVehicle wheels are raycasts, not bodies. applyTyreModel rewrites
-    // it per wheel per frame from this as the nominal value.
-    this.baseSlip = wheelOptions.frictionSlip ?? 1.6;
-    this.drivetrain = new Drivetrain(model.wheelRadius);
+    // RaycastVehicle wheels are raycasts, not bodies.
     this.vehicle.addToWorld(world);
 
     // --- Brake lights ------------------------------------------------------
@@ -309,61 +232,36 @@ export class Car {
     for (const side of [-1, 1]) {
       const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.06), this.brakeLights);
       lamp.position.set(side * model.half.w * 0.62, 0.42, -model.half.l - 0.03);
+      // Stays on the lit path: the matcap pass would replace this material
+      // with a flat one, and braking works by driving its emissive level.
+      lamp.userData.lit = true;
       this.object.add(lamp);
     }
-
-    // --- Headlights --------------------------------------------------------
-    // Parented to the car, so they sweep with the steering. Shadows are off:
-    // two shadow-casting spotlights on a moving car costs more than the sun
-    // and buys nothing you can see at this camera distance.
-    this.headlightMat = new THREE.MeshStandardMaterial({
-      color: 0xfff6e0,
-      emissive: 0xfff0d0,
-      emissiveIntensity: 0,
-      roughness: 0.3,
-    });
-    for (const side of [-1, 1]) {
-      const lens = new THREE.Mesh(
-        new THREE.BoxGeometry(0.3, 0.14, 0.06),
-        this.headlightMat
-      );
-      lens.position.set(side * model.half.w * 0.58, 0.46, model.half.l + 0.02);
-      this.object.add(lens);
-
-      const beam = new THREE.SpotLight(0xffeccc, 0, 46, 0.5, 0.45, 1.2);
-      beam.position.copy(lens.position);
-      beam.target.position.set(side * 0.6, -0.4, model.half.l + 14);
-      this.object.add(beam, beam.target);
-      this.beams.push(beam);
-    }
   }
 
-  /** Headlights on/off. Night mode is the world's business, not the car's. */
-  setLights(on: boolean) {
-    this.lightsOn = on;
-    this.headlightMat.emissiveIntensity = on ? 4 : 0;
-    for (const beam of this.beams) beam.intensity = on ? 170 : 0;
+  /** Wheels are separate roots: add them alongside the body group. */
+  addTo(scene: THREE.Scene) {
+    scene.add(this.object, ...this.wheels);
   }
 
-  get hasLights() {
-    return this.lightsOn;
+  get speedKmh() {
+    return Math.abs(this.vehicle.currentVehicleSpeedKmHour);
   }
 
   /**
-   * How hard the tyres are sliding, 0..1.
+   * How much the car is sliding rather than rolling, 0 .. 1. Drives the tyre
+   * marks and the dust.
    *
-   * Two sources, whichever is angrier. `skidInfo` is cannon's own verdict
-   * (1 = gripping, 0 = the friction impulse was clipped) and it catches a
-   * handbrake slide instantly; chassis lateral velocity catches the slower
-   * four-wheel drift that never clips an impulse. Neither alone is enough.
+   * Two readings, worst wins: sideways speed at the chassis, and the least
+   * grip any loaded wheel reports. Below walking pace it always reads zero, or
+   * shuffling the car at a standstill paints marks.
    */
   get slip() {
     LOCAL_VEL.copy(this.body.velocity);
     this.body.quaternion.conjugate(INV_QUAT);
     INV_QUAT.vmult(LOCAL_VEL, LOCAL_VEL);
     const lateral = Math.abs(LOCAL_VEL.x);
-    const forward = Math.abs(LOCAL_VEL.z);
-    if (forward + lateral < 2) return 0;
+    if (Math.abs(LOCAL_VEL.z) + lateral < 2) return 0;
 
     let grip = 1;
     for (const w of this.vehicle.wheelInfos) {
@@ -376,9 +274,8 @@ export class Car {
   /**
    * Height of whatever the wheels are standing on, or NaN in mid-air.
    *
-   * Note this reads `raycastResult.hasHit`, not `isInContact`: cannon-es
-   * leaves `isInContact` false even with all four wheels planted, so trusting
-   * it reports the car permanently airborne.
+   * Reads `raycastResult.hasHit`, not `isInContact`: cannon-es leaves the
+   * latter false even with all four wheels planted.
    */
   get groundY() {
     let y = -Infinity;
@@ -388,157 +285,43 @@ export class Car {
     return y === -Infinity ? NaN : y;
   }
 
-  /** True when no wheel can find the ground. */
-  get airborne() {
-    return this.vehicle.wheelInfos.every((w) => !w.raycastResult.hasHit);
-  }
-
-  /** Is this wheel carrying any load? */
+  /** Is this wheel on the ground? */
   wheelDown(i: number) {
     return this.vehicle.wheelInfos[i].raycastResult.hasHit;
   }
 
   /** World-space contact point under a wheel, for dropping tyre marks. */
   contactPoint(i: number, out: THREE.Vector3) {
-    const r = this.vehicle.wheelInfos[i].raycastResult;
-    return out.set(r.hitPointWorld.x, r.hitPointWorld.y, r.hitPointWorld.z);
-  }
-
-  get yaw() {
-    YAW_EULER.setFromQuaternion(this.object.quaternion as unknown as THREE.Quaternion);
-    return YAW_EULER.y;
-  }
-
-  /** Wheels are separate roots: add them alongside the body group. */
-  addTo(scene: THREE.Scene) {
-    scene.add(this.object, ...this.wheels);
-  }
-
-  get speedKmh() {
-    return Math.abs(this.vehicle.currentVehicleSpeedKmHour);
-  }
-
-  /** How far this wheel's spring is squashed, 0 (hanging) .. 1 (bottomed). */
-  private compression(w: CANNON.WheelInfo) {
-    if (!w.raycastResult.hasHit) return 0;
-    const rest = w.suspensionRestLength;
-    return Math.min(1, Math.max(0, (rest - w.suspensionLength) / rest));
-  }
-
-  /**
-   * One anti-roll bar. Ties the two wheels of an axle together so that the
-   * difference in how far each spring is squashed produces a couple opposing
-   * the roll: the loaded side is held up, the unloaded side pulled down.
-   */
-  private antiRoll(left: number, right: number, strength: number) {
-    const wl = this.vehicle.wheelInfos[left];
-    const wr = this.vehicle.wheelInfos[right];
-
-    // With a wheel off the ground there is nothing to react against, and
-    // applying the couple anyway is what flicks an airborne car over.
-    if (!wl.raycastResult.hasHit || !wr.raycastResult.hasHit) return;
-
-    const diff = this.compression(wl) - this.compression(wr);
-    if (Math.abs(diff) < 1e-4) return;
-    const magnitude = diff * strength;
-
-    // Hold the more compressed side up...
-    ROLL_FORCE.set(0, magnitude, 0);
-    this.body.quaternion.vmult(wl.chassisConnectionPointLocal, ROLL_POINT);
-    this.body.applyForce(ROLL_FORCE, ROLL_POINT);
-
-    // ...and pull the extended side down by the same amount.
-    ROLL_FORCE.set(0, -magnitude, 0);
-    this.body.quaternion.vmult(wr.chassisConnectionPointLocal, ROLL_POINT);
-    this.body.applyForce(ROLL_FORCE, ROLL_POINT);
-  }
-
-  /**
-   * Bleeds off rotation about the car's own forward axis only. Raising
-   * `angularDamping` would do this too, but it would damp yaw with it, and
-   * yaw is the entire drift.
-   */
-  private dampRoll() {
-    this.body.quaternion.vmult(FORWARD, ROLL_AXIS);
-    const rate = this.body.angularVelocity.dot(ROLL_AXIS);
-    if (Math.abs(rate) < 1e-3) return;
-    ROLL_AXIS.scale(-rate * ROLL_DAMP, ROLL_TORQUE);
-    this.body.torque.vadd(ROLL_TORQUE, this.body.torque);
+    const r = this.vehicle.wheelInfos[i].raycastResult.hitPointWorld;
+    return out.set(r.x, r.y, r.z);
   }
 
   applyInput(input: CarInput, dt: number) {
-    // Steering lock falls away with speed. Full lock at 80 is how you spin a
-    // car by breathing on the keyboard.
-    const speed = this.vehicle.currentVehicleSpeedKmHour;
-    const lockScale = 1 - 0.45 * Math.min(1, Math.abs(speed) / 70);
-    const target = input.steer * MAX_STEER * lockScale;
+    // Ease steering in/out so keyboard input doesn't feel binary.
+    const target = input.steer * MAX_STEER;
     const rate = Math.abs(target) > 0.001 ? 4.5 : 8;
     this.steerValue += (target - this.steerValue) * Math.min(1, rate * dt);
 
     this.vehicle.setSteeringValue(this.steerValue, 0);
     this.vehicle.setSteeringValue(this.steerValue, 1);
 
+    const speed = this.vehicle.currentVehicleSpeedKmHour;
     // Pressing the opposite direction while rolling = brakes, not instant reverse
     const braking =
       input.brake ||
       (input.throttle < -0.05 && speed > 2) ||
       (input.throttle > 0.05 && speed < -2);
-    const hand = input.handbrake === true;
 
-    const drive = this.drivetrain.update(braking ? 0 : input.throttle, speed, dt);
-    this.lastDrive = drive;
-
-    // Lateral velocity in the car's own frame tells the tyre model how far
-    // past the grip peak the whole car is.
-    LOCAL_VEL.copy(this.body.velocity);
-    this.body.quaternion.conjugate(INV_QUAT);
-    INV_QUAT.vmult(LOCAL_VEL, LOCAL_VEL);
-    applyTyreModel(this.vehicle, this.baseSlip, LOCAL_VEL.x);
-
-    // Handbrake: take most of the rear tyres' grip away, after the tyre model
-    // has had its say. Locking them alone just scrubs speed off in a straight
-    // line; it is losing the lateral grip that swings the back round.
-    if (hand) {
-      this.vehicle.wheelInfos[2].frictionSlip *= HANDBRAKE_GRIP;
-      this.vehicle.wheelInfos[3].frictionSlip *= HANDBRAKE_GRIP;
-    }
-
-    // Keep it on its wheels. Both of these run every frame, grounded or not,
-    // and they are what stopped it falling over in a corner.
-    this.antiRoll(0, 1, ROLL_BAR_FRONT);
-    this.antiRoll(2, 3, ROLL_BAR_REAR);
-    this.dampRoll();
-
-    // Torque is split across the driven wheels, not handed to each of them.
-    const perWheel = drive.force / 4;
+    const capped = Math.abs(speed) >= MAX_KMH;
+    const force = braking || capped ? 0 : -input.throttle * MAX_FORCE;
 
     for (let i = 0; i < 4; i++) {
-      // Rear pair (2, 3) takes the handbrake; the fronts keep steering.
-      const rear = i >= 2;
-      this.vehicle.setBrake(
-        hand && rear ? HANDBRAKE_FORCE : braking ? BRAKE_FORCE : 0,
-        i
-      );
+      this.vehicle.setBrake(braking ? BRAKE_FORCE : 0, i);
       // All-wheel drive: far more forgiving to drive than rear-only
-      this.vehicle.applyEngineForce(braking ? 0 : perWheel, i);
+      this.vehicle.applyEngineForce(force, i);
     }
 
-    // Drag and rolling resistance, opposing travel. Without these the car
-    // coasts forever and the gearbox has nothing to pull against.
-    const v = this.body.velocity;
-    const sp = Math.hypot(v.x, v.z);
-    if (sp > 0.05) {
-      const mag = DRAG * sp * sp + ROLLING;
-      DRAG_F.set((-v.x / sp) * mag, 0, (-v.z / sp) * mag);
-      this.body.applyForce(DRAG_F, this.body.position);
-    }
-
-    this.brakeLights.emissiveIntensity = braking || hand ? 5 : 0.5;
-  }
-
-  /** Engine state, for the audio and anything that wants a gauge. */
-  get drive() {
-    return this.lastDrive;
+    this.brakeLights.emissiveIntensity = braking ? 5 : 0.5;
   }
 
   /** Sync meshes to physics. Call after world.step(). */
@@ -562,7 +345,6 @@ export class Car {
     this.body.angularVelocity.setZero();
     this.body.quaternion.setFromAxisAngle(UP, SPAWN_YAW);
     this.steerValue = 0;
-    this.drivetrain.reset();
   }
 
   /** True when the car is on its roof or side and stuck. */

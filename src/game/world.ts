@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { sites, type Site } from '../data/sites';
 import type { PropLibrary } from './props';
-import { dressWorld, labelBlock, type Spot } from './dressing';
-import { createSky, DAY, NIGHT } from './sky';
+import { dressWorld, labelBlock, STACK, type Spot } from './dressing';
 import { stabilise } from './solver';
+import { matcapify } from './matcap';
 
 export type { Spot };
 
@@ -62,8 +62,6 @@ export interface WorldBits {
   secrets: Secret[];
   /** How many props have been shoved off their mark, and how many exist. */
   score: () => { knocked: number; total: number };
-  /** Day to night: sun, sky, fog and the lit signage all move together. */
-  setNight: (on: boolean) => void;
   /** Lower-cost mode for phones and weak GPUs. */
   setQuality: (level: 'high' | 'low') => void;
   update: (elapsed: number, carPos?: THREE.Vector3) => void;
@@ -83,13 +81,13 @@ const POSTER_W = 11;
  */
 const DROP = 3.5;
 
-/**
- * Fog per metre. At this arena's 260x300 the far wall sits at roughly 0.45
- * haze, so distance reads without the near zones going milky.
- */
-const FOG_DENSITY = 0.0022;
-/** Weak hardware draws less, and thicker haze covers the shorter draw. */
-const FOG_DENSITY_LOW = 0.0042;
+/** Haze colour, and the colour the gradient sky fades to at the horizon. */
+const SKY = 0xcfe0f2;
+/** Where the haze starts and where it has swallowed everything, in metres. */
+const FOG_NEAR = 130;
+const FOG_FAR = 420;
+/** Weak hardware draws less, and pulling the haze in covers the shorter draw. */
+const FOG_FAR_LOW = 300;
 
 /**
  * Where each zone sits. The avenue runs -Z from the start plaza.
@@ -202,6 +200,29 @@ function groundTexture() {
   return tex;
 }
 
+/** Vertical gradient sky on an inverted sphere. */
+function addSky(scene: THREE.Scene) {
+  const c = document.createElement('canvas');
+  c.width = 2;
+  c.height = 256;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, '#4d7fb8');
+  g.addColorStop(0.5, '#a8c6e4');
+  g.addColorStop(1, '#dfe8f2');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 2, 256);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(520, 24, 16),
+    new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false })
+  );
+  scene.add(sky);
+}
+
 /* -------------------------------------------------------------------- build */
 
 export function buildWorld(
@@ -210,9 +231,6 @@ export function buildWorld(
   groundMaterial: CANNON.Material,
   loader: THREE.TextureLoader,
   lib: PropLibrary,
-  // The sky bakes an environment map and samples its own horizon, both of
-  // which are GPU work, so the world needs the renderer now.
-  renderer: THREE.WebGLRenderer,
   maxAnisotropy = 8
 ): WorldBits {
   const props: Prop[] = [];
@@ -324,32 +342,14 @@ export function buildWorld(
   };
 
   // --- Sky, light, fog ---------------------------------------------------
-
-  // Scattering model, the environment light baked off it, and the horizon
-  // colour sampled from it. See sky.ts for why those three travel together.
-  const sky = createSky(scene, renderer);
-
-  /**
-   * Exponential fog, not linear.
-   *
-   * Real distance haze accumulates per metre, so contrast falls away smoothly
-   * from the very first metre; linear near/far switches the effect on at a
-   * plane, which is why the far side of the arena used to look like it had
-   * weather rather than distance. The colour comes off the sky itself, so
-   * distant trees dissolve into the horizon instead of standing against it.
-   */
-  scene.fog = new THREE.FogExp2(sky.horizon.getHex(), FOG_DENSITY);
-
-  // Deliberately small. With `scene.environment` carrying the sky, a
-  // hemisphere light at its old 2.2 is counting the same bounce twice and
-  // flattens everything it touches. This is a nudge in the shadows, no more.
-  const hemi = new THREE.HemisphereLight(0xdfeaff, 0x6b7280, 0.3);
+  addSky(scene);
+  scene.fog = new THREE.Fog(SKY, FOG_NEAR, FOG_FAR);
+  const hemi = new THREE.HemisphereLight(0xdfeaff, 0x6b7280, 2.2);
   scene.add(hemi);
 
   const sun = new THREE.DirectionalLight(0xfff4e2, 2.6);
-  // Aimed from wherever the sky says the sun is, so the shadows and the bright
-  // patch of sky finally agree with each other.
-  sun.position.copy(sky.sunDirection).multiplyScalar(90);
+  const sunDir = new THREE.Vector3(40, 60, 30).normalize();
+  sun.position.copy(sunDir).multiplyScalar(90);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 1;
@@ -371,6 +371,9 @@ export function buildWorld(
   ground.rotation.x = -Math.PI / 2;
   ground.position.z = ARENA.cz;
   ground.receiveShadow = true;
+  // The floor stays on the lit path: a matcap surface cannot receive a shadow
+  // map, and the car's shadow on the tarmac is the one shadow worth having.
+  ground.userData.lit = true;
   scene.add(ground);
 
   // A slab, not an infinite CANNON.Plane: a rotated Plane's world AABB comes
@@ -393,6 +396,7 @@ export function buildWorld(
     mesh.rotateZ(-yaw);
     mesh.position.set(x, 0.01, z);
     mesh.receiveShadow = true;
+    mesh.userData.lit = true;
     scene.add(mesh);
   };
 
@@ -503,6 +507,10 @@ export function buildWorld(
   });
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x4a5261, roughness: 0.8 });
 
+  /** Next tool block to stand at a pad mouth; walks the list as pads are laid. */
+  let stackCursor = 0;
+  const GATE_AT = new THREE.Vector3();
+
   /**
    * One site pad: the screenshot on the tarmac, a kerb around it, the name
    * painted at the near edge, and the billboard standing at the far edge.
@@ -526,6 +534,7 @@ export function buildWorld(
     panel.rotation.x = -Math.PI / 2;
     panel.position.y = 0.04;
     panel.receiveShadow = true;
+    panel.userData.lit = true;
     group.add(panel);
 
     for (const [kw, kd, kx, kz] of [
@@ -600,6 +609,31 @@ export function buildWorld(
     group.add(pylon);
     registerFade(pylon, 30, 62, true);
 
+    /**
+     * Two tool blocks standing either side of the way in, one skill each,
+     * taken in turn so the stack is spread across all three zones rather than
+     * penned into a yard of its own. They are knockable props, so the pad is
+     * something you drive *through* rather than park politely on.
+     */
+    // The group's world matrix is still stale here, and localToWorld reads it:
+    // without this the blocks all pile up at the origin.
+    group.updateMatrixWorld();
+    for (const side of [-1, 1] as const) {
+      const [name, colour] = STACK[stackCursor % STACK.length];
+      stackCursor++;
+      const size = 2.6;
+      // Pad-local: just outside the kerb, level with the painted name. The
+      // group carries the yaw, so this lands correctly in every zone.
+      GATE_AT.set(side * (PAD.w / 2 + 2.2), size / 2, PAD.d / 2 + 1.2);
+      group.localToWorld(GATE_AT);
+      addProp(
+        labelBlock(name, colour, size),
+        new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2)),
+        [GATE_AT.x, GATE_AT.y, GATE_AT.z],
+        3
+      );
+    }
+
     scene.add(group);
     boards.push({
       site,
@@ -645,6 +679,7 @@ export function buildWorld(
   courtyardFloor.rotation.x = -Math.PI / 2;
   courtyardFloor.position.set(COURTYARD.x, 0.012, COURTYARD.z);
   courtyardFloor.receiveShadow = true;
+  courtyardFloor.userData.lit = true;
   scene.add(courtyardFloor);
 
   // --- CV podium, with room to keep driving past it ----------------------
@@ -1204,48 +1239,11 @@ export function buildWorld(
     return { knocked, total: props.length };
   };
 
-  /**
-   * Day and night are the same scene with different light. Nothing is rebuilt:
-   * the sky swaps texture, the two lights change colour and level, and the fog
-   * pulls in, which is what actually sells a night drive.
-   */
-  // Fog density is the product of two independent decisions, so both are kept
-  // rather than each overwriting the other: toggling night used to silently
-  // undo an auto-quality downgrade.
-  let isNight = false;
-  let quality: 'high' | 'low' = 'high';
-  const applyFog = () => {
-    const fog = scene.fog as THREE.FogExp2;
-    const base = quality === 'high' ? FOG_DENSITY : FOG_DENSITY_LOW;
-    // Night air is clearer to look through but there is less to see: denser
-    // haze keeps the arena edge from being a hard line against the stars.
-    fog.density = base * (isNight ? 1.5 : 1);
-  };
-
-  const setNight = (on: boolean) => {
-    isNight = on;
-    // Moving the sun below the horizon does most of the work: the shader
-    // re-scatters, the environment map is rebuilt off the darker sky and the
-    // horizon is re-sampled, so the fog matches without being told a colour.
-    const preset = on ? NIGHT : DAY;
-    sky.apply(preset);
-    renderer.toneMappingExposure = preset.exposure;
-
-    sun.position.copy(sky.sunDirection).multiplyScalar(90);
-    sun.intensity = on ? 0.32 : 2.6;
-    sun.color.set(on ? 0xa8bede : 0xfff4e2);
-    hemi.intensity = on ? 0.12 : 0.3;
-    hemi.color.set(on ? 0x2d3c5e : 0xdfeaff);
-    hemi.groundColor.set(on ? 0x0d1119 : 0x6b7280);
-
-    (scene.fog as THREE.FogExp2).color.copy(sky.horizon);
-    applyFog();
-  };
-
   const setQuality = (level: 'high' | 'low') => {
-    quality = level;
+    // Shadows and the far haze are the two levers: off and pulled in, a weak
+    // GPU draws far less and the shorter draw distance is covered by fog.
     sun.castShadow = level === 'high';
-    applyFog();
+    (scene.fog as THREE.Fog).far = level === 'high' ? FOG_FAR : FOG_FAR_LOW;
   };
 
   const ropePoints = rope.geometry.attributes.position as THREE.BufferAttribute;
@@ -1283,20 +1281,35 @@ export function buildWorld(
     }
   };
 
-  setNight(false);
+  /**
+   * Flat matcap shading for everything except the surfaces marked `lit`.
+   *
+   * Run once here, after the last mesh exists. The fade registry captured the
+   * materials it was given during the build, and those objects have just been
+   * replaced, so it is re-pointed at what is actually on the meshes now —
+   * otherwise distant signage would pop in rather than fade.
+   */
+  matcapify(scene);
+  for (const f of fades) {
+    f.mats.length = 0;
+    f.obj.traverse((o) => {
+      const m = (o as THREE.Mesh).material;
+      if (!m) return;
+      for (const mat of Array.isArray(m) ? m : [m]) f.mats.push(mat);
+    });
+  }
 
   return {
     boards,
     spots: dressing.spots,
     playVideo: dressing.playVideo,
     sun,
-    sunDir: sky.sunDirection,
+    sunDir,
     blockers,
     cv: { position: cvPos, radius: 7 },
     respawns,
     secrets,
     score,
-    setNight,
     setQuality,
     update,
     start,

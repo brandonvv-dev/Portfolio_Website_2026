@@ -229,8 +229,12 @@ function signTexture(title: string, sub: string, accent: string, style: SignStyl
 
 /* ------------------------------------------------------------ the stack */
 
-/** The tools, as blocks you can drive into. */
-const STACK: [string, string][] = [
+/**
+ * The tools, as blocks you can drive into. Exported because world.ts stands a
+ * pair of them at the mouth of every site pad, so the stack and the client
+ * work are met together rather than in two separate exhibits.
+ */
+export const STACK: [string, string][] = [
   ['C#', '#8b2be2'],
   ['.NET', '#512bd4'],
   ['React', '#61dafb'],
@@ -794,25 +798,12 @@ export function dressWorld(ctx: DressContext): Dressing {
     count++;
   }
 
-  /* ------------------------------------------------------- the stack yard */
+  /* ------------------------------------------------------------ the stack */
 
-  // A gauntlet down the east spur: every tool, in two staggered rows, right on
-  // the road out to the courtyard. You cannot take that route without
-  // ploughing through the whole stack.
-  STACK.forEach(([name, color], i) => {
-    const size = 2.6;
-    const x = 34 + Math.floor(i / 2) * 6.4;
-    const z = 28 + (i % 2 === 0 ? -4.5 : 4.5);
-    addProp(
-      stackBlock(name, color, size),
-      new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2)),
-      [x, size / 2, z],
-      3
-    );
-    count++;
-  });
-
-  // And a scattering of bigger ones out in the open, as landmarks
+  // The gauntlet down the east spur is gone: the tools now stand at the mouth
+  // of every site pad (see world.ts), so you meet the stack and the work that
+  // was built with it in the same place instead of in two separate exhibits.
+  // What is left here is the scattering out in the open, as landmarks.
   count += scatter(16, () => {
     const [name, color] = one(STACK);
     return { name, color, height: 3.4 + rand() * 1.6, collide: true, mass: 4, stack: true };

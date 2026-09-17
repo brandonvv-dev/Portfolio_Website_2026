@@ -163,11 +163,11 @@ export interface Effects {
   dust(x: number, y: number, z: number, hard: number): void;
   sparks(x: number, y: number, z: number, hard: number): void;
   /**
-   * Moves the blob shadow onto whatever the car is over. `groundY` matters:
-   * pinned to y=0 the shadow ends up inside the tunnel while the car is on
-   * its roof. `lift` fades and spreads it as the car climbs.
+   * Moves the blob shadow under the car. `y` is the height of whatever is
+   * below it, so it lands on the tunnel roof rather than through it, and
+   * `lift` fades it out as the car leaves the ground.
    */
-  shadow(x: number, groundY: number, z: number, yaw: number, lift: number): void;
+  shadow(x: number, y: number, z: number, yaw: number, lift: number): void;
   update(dt: number): void;
 }
 
@@ -202,7 +202,6 @@ export function createEffects(scene: THREE.Scene): Effects {
   const markQuat = new THREE.Quaternion();
   const markPos = new THREE.Vector3();
   const markScale = new THREE.Vector3();
-  const flat = new THREE.Euler(-Math.PI / 2, 0, 0, 'XYZ');
 
   /* --- Particles --------------------------------------------------------- */
   const dustSystem = particleSystem(scene, PARTICLES, THREE.NormalBlending);
@@ -233,7 +232,6 @@ export function createEffects(scene: THREE.Scene): Effects {
       marks.setMatrixAt(markCursor, markMatrix);
       markCursor = (markCursor + 1) % SKIDS;
       marks.instanceMatrix.needsUpdate = true;
-      void flat;
     },
 
     dust(x, y, z, hard) {
@@ -242,9 +240,9 @@ export function createEffects(scene: THREE.Scene): Effects {
       dustSystem.emit(x, y, z, dustColour, {
         spread: 0.8 + hard * 1.6,
         rise: 0.9 + hard * 1.4,
-        size: 0.3 + hard * 0.35,
-        life: 0.42 + hard * 0.4,
-        grow: 0.95,
+        size: 0.5 + hard * 0.5,
+        life: 0.5 + hard * 0.5,
+        grow: 1.6,
       });
     },
 
@@ -259,13 +257,10 @@ export function createEffects(scene: THREE.Scene): Effects {
       });
     },
 
-    shadow(x, groundY, z, yaw, lift) {
-      blob.position.set(x, groundY + 0.035, z);
+    shadow(x, y, z, yaw, lift) {
+      blob.position.set(x, y + 0.035, z);
       blob.rotation.set(-Math.PI / 2, 0, -yaw);
-      // Higher up: softer, wider, fainter, the way a real one goes.
-      const spread = 1 + Math.min(lift, 6) * 0.14;
-      blob.scale.set(spread, spread, 1);
-      blobMat.opacity = Math.max(0.04, 0.34 - Math.min(lift, 6) * 0.045);
+      blobMat.opacity = Math.max(0, 0.34 - lift * 0.12);
     },
 
     update(dt) {
