@@ -1,27 +1,10 @@
 /**
  * Motion runtime. Deliberately tiny: continuous scroll effects live in CSS
  * (scroll-driven animations), so JS only handles what CSS cannot —
- * enter-once reveals, word splitting, and pointer tilt.
+ * enter-once reveals and pointer tilt.
  */
 
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/** Split `.reveal-words` text into per-word spans so CSS can stagger them. */
-function splitWords() {
-  document.querySelectorAll<HTMLElement>('.reveal-words').forEach((el) => {
-    if (el.dataset.split) return;
-    el.dataset.split = '1';
-    const words = (el.textContent ?? '').trim().split(/\s+/);
-    el.textContent = '';
-    words.forEach((word, i) => {
-      const span = document.createElement('span');
-      span.className = 'w';
-      span.style.setProperty('--i', String(i));
-      span.textContent = word;
-      el.append(span, document.createTextNode(' '));
-    });
-  });
-}
 
 /**
  * Reveal anything carrying a reveal class once it reaches the fold.
@@ -33,7 +16,7 @@ function splitWords() {
  */
 function observeReveals() {
   let targets = [
-    ...document.querySelectorAll<HTMLElement>('.reveal, .reveal-blur, .reveal-words'),
+    ...document.querySelectorAll<HTMLElement>('.reveal, .reveal-blur, .reveal-zoom'),
   ];
   if (reduced) {
     targets.forEach((el) => el.classList.add('is-in'));
@@ -165,7 +148,6 @@ function parallaxFallback() {
 }
 
 function init() {
-  splitWords();
   observeReveals();
   bindTilt();
   bindNav();

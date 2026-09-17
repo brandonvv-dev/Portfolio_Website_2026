@@ -246,53 +246,39 @@ video {
   transform: none;
 }
 
-/* Word-by-word headline stagger */
-.reveal-words .w {
-  display: inline-block;
-  opacity: 0;
-  transform: translate3d(0, 0.45em, 0);
-  transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);
-  transition-delay: calc(var(--i, 0) * 55ms);
-}
-.reveal-words.is-in .w {
-  opacity: 1;
-  transform: none;
-}
-
 /*
- * Depth headline: words start far down the z-axis (small, sitting low) and fly
- * toward the viewer, overshooting the screen plane before settling. Shares the
- * .reveal-words word split, so only the transform track differs.
- * Perspective lives on the h1 so words off-centre splay outward as they arrive.
+ * Zoom headline: the whole line starts as a speck at the centre of its own box
+ * and rushes up to full size, overshooting a touch before it settles.
+ *
+ * Deliberately one transform on one element. Splitting the line into words
+ * makes each word grow from its own centre, which reads as several things
+ * arriving rather than one name coming at you.
  */
-.reveal-depth {
-  perspective: 900px;
-  perspective-origin: 50% 60%;
-  transform-style: preserve-3d;
-}
-.reveal-words.reveal-depth .w {
+.reveal-zoom {
   opacity: 0;
-  transform: translate3d(0, 0.55em, -1800px);
+  transform: scale(0.03);
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
 }
-.reveal-words.reveal-depth.is-in .w {
-  animation: word-forward 1.15s var(--ease-out) both;
-  animation-delay: calc(var(--i, 0) * 120ms);
+.reveal-zoom.is-in {
+  animation: zoom-in 1.05s var(--ease-out) both;
+  animation-delay: var(--d, 0ms);
 }
-@keyframes word-forward {
+@keyframes zoom-in {
   0% {
     opacity: 0;
-    transform: translate3d(0, 0.55em, -1800px);
+    transform: scale(0.03);
   }
-  55% {
+  22% {
     opacity: 1;
   }
-  78% {
+  80% {
     opacity: 1;
-    transform: translate3d(0, -0.03em, 60px);
+    transform: scale(1.025);
   }
   100% {
     opacity: 1;
-    transform: none;
+    transform: scale(1);
   }
 }
 
@@ -445,10 +431,11 @@ video {
   }
   .reveal,
   .reveal-blur,
-  .reveal-words .w {
+  .reveal-zoom {
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
+    animation: none !important;
   }
 }
 
