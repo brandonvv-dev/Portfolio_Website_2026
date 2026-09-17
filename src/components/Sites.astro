@@ -1,0 +1,276 @@
+---
+import { sites } from '../data/sites';
+
+const total = sites.reduce((n, s) => n + s.images.length, 0);
+---
+
+<section id="sites" class="sites">
+  <div class="shell">
+    <header class="sites-head">
+      <div>
+        <p class="t-eyebrow reveal">Client work</p>
+        <h2 class="t-headline t-shine reveal" style="--d:80ms">
+          Twenty sites,<br />shipped and live.
+        </h2>
+      </div>
+      <p class="t-body sites-lede reveal" style="--d:160ms">
+        Salons, barbers, auto shops, legal, dental, trades. {total} screens across
+        {sites.length} builds &mdash; every one of them designed, built and handed over.
+        <a class="link-arrow" href="/drive">Drive through them instead</a>
+      </p>
+    </header>
+
+    <ul class="grid">
+      {
+        sites.map((s, i) => (
+          <li id={`site-${s.slug}`} class="reveal" style={`--d:${(i % 4) * 70}ms`}>
+            <button
+              class="card tilt"
+              data-tilt="5"
+              type="button"
+              data-site={s.slug}
+              data-name={s.name}
+              data-images={JSON.stringify(s.images)}
+            >
+              <span class="num">{String(s.num).padStart(2, '0')}</span>
+              <img src={s.card} alt={`${s.name} website`} loading="lazy" decoding="async" width="900" height="563" />
+              <span class="meta">
+                <b>{s.name}</b>
+                <small>{s.images.length} screens</small>
+              </span>
+            </button>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<dialog class="lightbox" data-lightbox>
+  <header>
+    <h3 data-lb-title></h3>
+    <button type="button" data-lb-close aria-label="Close">&times;</button>
+  </header>
+  <div class="rail" data-lb-rail></div>
+</dialog>
+
+<script>
+  const dialog = document.querySelector<HTMLDialogElement>('[data-lightbox]');
+  const rail = document.querySelector<HTMLElement>('[data-lb-rail]');
+  const title = document.querySelector<HTMLElement>('[data-lb-title]');
+
+  if (dialog && rail && title) {
+    const open = (btn: HTMLElement) => {
+      const images: string[] = JSON.parse(btn.dataset.images ?? '[]');
+      title.textContent = btn.dataset.name ?? '';
+      // Built on open, not on page load: 189 screenshots is not a page weight.
+      rail.replaceChildren(
+        ...images.map((src, i) => {
+          const img = document.createElement('img');
+          img.src = src;
+          img.alt = '';
+          img.loading = i < 2 ? 'eager' : 'lazy';
+          img.decoding = 'async';
+          return img;
+        })
+      );
+      rail.scrollLeft = 0;
+      dialog.showModal();
+    };
+
+    document.querySelectorAll<HTMLElement>('[data-site]').forEach((btn) => {
+      btn.addEventListener('click', () => open(btn));
+    });
+
+    document.querySelector('[data-lb-close]')?.addEventListener('click', () => dialog.close());
+
+    // Clicking the backdrop closes; clicking the panel itself must not.
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) dialog.close();
+    });
+
+    // Free the images again so a long session doesn't hoard decoded bitmaps.
+    dialog.addEventListener('close', () => rail.replaceChildren());
+
+    // The game links back here as /#site-<slug>, so open that one on arrival.
+    const fromHash = () => {
+      const slug = location.hash.replace('#site-', '');
+      if (!slug || slug === location.hash) return;
+      const btn = document.querySelector<HTMLElement>(`[data-site="${CSS.escape(slug)}"]`);
+      if (btn) open(btn);
+    };
+    addEventListener('hashchange', fromHash);
+    fromHash();
+  }
+</script>
+
+<style>
+  .sites {
+    padding-block: clamp(5rem, 12vw, 9rem);
+    border-top: 1px solid var(--hairline);
+  }
+
+  .sites-head {
+    display: grid;
+    gap: 1.5rem;
+    margin-bottom: clamp(2.5rem, 6vw, 4rem);
+  }
+  .sites-head h2 {
+    margin: 0.5rem 0 0;
+  }
+  .sites-lede {
+    margin: 0;
+    max-width: 46ch;
+    align-self: end;
+  }
+  .sites-lede a {
+    display: block;
+    margin-top: 0.75rem;
+  }
+
+  .grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+  }
+  .grid > li {
+    display: flex;
+  }
+
+  .card {
+    position: relative;
+    /* Column + auto margin on the caption keeps rows even when a name wraps */
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0;
+    border: 1px solid var(--hairline);
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--surface);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.3s var(--ease), box-shadow 0.4s var(--ease);
+  }
+  .card:hover {
+    border-color: var(--hairline-strong);
+    box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.9);
+  }
+
+  .card img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+    object-position: top center;
+    transition: transform 0.6s var(--ease-out);
+  }
+  .card:hover img {
+    transform: scale(1.04);
+  }
+
+  .num {
+    position: absolute;
+    top: 0.6rem;
+    left: 0.6rem;
+    z-index: 2;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 0.25rem 0.5rem;
+    border-radius: 980px;
+    color: var(--text);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+  }
+
+  .meta {
+    display: grid;
+    gap: 0.15rem;
+    margin-top: auto;
+    padding: 0.85rem 1rem 1rem;
+    border-top: 1px solid var(--hairline);
+  }
+  .meta b {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+  }
+  .meta small {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+
+  /* --- Lightbox --------------------------------------------------------- */
+  .lightbox {
+    width: min(1180px, 94vw);
+    max-width: none;
+    max-height: 90vh;
+    padding: 0;
+    border: 1px solid var(--hairline-strong);
+    border-radius: 20px;
+    background: #0c0c0e;
+    color: var(--text);
+    overflow: hidden;
+  }
+  .lightbox::backdrop {
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(6px);
+  }
+
+  .lightbox header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .lightbox h3 {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+  .lightbox header button {
+    font: inherit;
+    font-size: 1.5rem;
+    line-height: 1;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--hairline);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .lightbox header button:hover {
+    color: var(--text);
+    border-color: var(--hairline-strong);
+  }
+
+  .lightbox .rail {
+    padding: 1.25rem;
+    --gutter: 1.25rem;
+  }
+  .lightbox .rail img {
+    flex: 0 0 auto;
+    width: min(86vw, 900px);
+    border-radius: 10px;
+    border: 1px solid var(--hairline);
+    scroll-snap-align: center;
+  }
+
+  @media (min-width: 900px) {
+    .sites-head {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+      align-items: end;
+    }
+  }
+</style>

@@ -20,8 +20,9 @@ import Layout from '../layouts/Layout.astro';
     <p class="mono">Brandon van Vuuren</p>
     <h1>Drive my CV.</h1>
     <p class="blurb">
-      My career is laid out on the floor. Drive over a project to open it, follow
-      the avenue to the end for the PDF, and knock over anything you like on the way.
+      Twenty client sites are laid out on the floor. Drive onto one to open it,
+      follow the avenue to the finish for the PDF, and wreck the playground on
+      the way — it keeps score.
     </p>
 
     <ul class="keys">
@@ -33,6 +34,7 @@ import Layout from '../layouts/Layout.astro';
 
     <button data-start class="start" type="button">Start driving</button>
     <a class="exit" href="/">Back to the normal site</a>
+    <p class="credit">Vehicle model by <a href="https://kenney.nl" target="_blank" rel="noopener">Kenney</a> (CC0)</p>
   </div>
 
   <!-- No WebGL -->
@@ -47,10 +49,12 @@ import Layout from '../layouts/Layout.astro';
 
   <!-- In-game chrome -->
   <div class="hud" data-hud hidden>
-    <a class="hud-exit" href="/">‹ Exit</a>
-    <div class="hud-speed"><b data-speed>0</b><span>km/h</span></div>
-    <button class="hud-sound" data-sound type="button" aria-pressed="false">Sound off</button>
-    <p class="hud-tip">WASD · <kbd>Space</kbd> brake · <kbd>R</kbd> reset</p>
+    <a class="hud-btn" href="/">‹ Exit</a>
+    <button class="hud-btn" data-reset type="button">Reset</button>
+    <button class="hud-btn" data-sound type="button" aria-pressed="false">Sound off</button>
+    <p class="hud-tip">WASD · <kbd>Space</kbd> brake · <kbd>R</kbd> reset · <kbd>H</kbd> horn</p>
+    <div class="hud-stat hud-score" title="Props knocked over"><b data-score>0/0</b><span>hit</span></div>
+    <div class="hud-stat"><b data-speed>0</b><span>km/h</span></div>
   </div>
 
   <aside class="panel" data-panel hidden></aside>
@@ -185,6 +189,15 @@ import Layout from '../layouts/Layout.astro';
     transform: scale(0.97);
   }
 
+  .credit {
+    margin: 0.5rem 0 0;
+    font-size: 0.6875rem;
+    color: var(--text-dim);
+  }
+  .credit a {
+    color: var(--text-muted);
+  }
+
   .exit {
     font-size: 0.8125rem;
     color: var(--text-dim);
@@ -228,8 +241,7 @@ import Layout from '../layouts/Layout.astro';
     pointer-events: auto;
   }
 
-  .hud-exit,
-  .hud-sound {
+  .hud-btn {
     font: inherit;
     font-size: 0.8125rem;
     font-weight: 550;
@@ -242,17 +254,15 @@ import Layout from '../layouts/Layout.astro';
     text-decoration: none;
     cursor: pointer;
   }
-  .hud-exit:hover,
-  .hud-sound:hover {
+  .hud-btn:hover {
     border-color: var(--hairline-strong);
   }
-  .hud-sound[aria-pressed='true'] {
+  .hud-btn[aria-pressed='true'] {
     color: var(--accent);
     border-color: var(--accent);
   }
 
-  .hud-speed {
-    margin-left: auto;
+  .hud-stat {
     display: flex;
     align-items: baseline;
     gap: 0.3rem;
@@ -263,14 +273,17 @@ import Layout from '../layouts/Layout.astro';
     backdrop-filter: blur(12px);
     font-variant-numeric: tabular-nums;
   }
-  .hud-speed b {
+  .hud-score {
+    margin-left: auto;
+  }
+  .hud-stat b {
     font-size: 1.125rem;
     font-weight: 650;
     letter-spacing: -0.02em;
     min-width: 2.2ch;
     text-align: right;
   }
-  .hud-speed span {
+  .hud-stat span {
     font-size: 0.6875rem;
     color: var(--text-dim);
   }
@@ -349,6 +362,13 @@ import Layout from '../layouts/Layout.astro';
     padding: 0.2rem 0.5rem;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 980px;
+  }
+  .panel .panel-shot {
+    display: block;
+    width: 100%;
+    margin-top: 0.85rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
   }
   .panel .panel-links {
     display: flex;
