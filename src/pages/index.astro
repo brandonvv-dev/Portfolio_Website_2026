@@ -1,5 +1,8 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import '../styles/site.css';
+import Noise from '../components/bits/Noise';
+import PageGrid from '../components/PageGrid.astro';
 import Nav from '../components/Nav.astro';
 import Hero from '../components/Hero.astro';
 import Work from '../components/Work.astro';
@@ -7,22 +10,27 @@ import Sites from '../components/Sites.astro';
 import Ventures from '../components/Ventures.astro';
 import About from '../components/About.astro';
 import GameTeaser from '../components/GameTeaser.astro';
-import Testimonials from '../components/Testimonials.astro';
 import Repos from '../components/Repos.astro';
 import Contact from '../components/Contact.astro';
+import { getRecentRepos } from '../utils/github';
+
+const repos = await getRecentRepos(9);
+const hasSource = repos.length > 0;
 ---
 
 <Layout>
-  <Nav />
-  <main>
-    <Hero />
+  <a class="skip" href="#main">Skip to content</a>
+  <PageGrid />
+  <Noise client:media="(min-width: 900px)" opacity={0.04} fps={8} contrast={0.5} />
+  <Nav hasSource={hasSource} />
+  <main id="main">
+    <Hero hasSource={hasSource} />
     <Work />
     <Sites />
     <Ventures />
     <About />
     <GameTeaser />
-    <Testimonials />
-    <Repos />
+    <Repos repos={repos} />
     <Contact />
   </main>
 </Layout>

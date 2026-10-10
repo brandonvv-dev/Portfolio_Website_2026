@@ -1,217 +1,288 @@
 ---
-import CvGameButton from './CvGameButton.astro';
+import Arrow from './Arrow.astro';
+import { sites } from '../data/sites';
+import { counts, cv, year } from '../utils/site';
 
-/**
- * Floating screenshots. Swap `src` for the new asset folder when it lands —
- * `depth` is the parallax travel in px, `pos` places it on the desktop canvas.
- */
-const floaters = [
-  { src: '/images/Proof of Work/kafka-streaming-dashboard/home dash.webp', alt: 'Streaming analytics dashboard', depth: 120, pos: 'left: 2%;  top: 18%;  width: 20vw; max-width: 270px;', delay: 220 },
-  { src: '/images/Proof of Work/Recode/analytics.png',                     alt: 'Recode analytics screen',      depth: 70,  pos: 'right: 3%; top: 14%;  width: 17vw; max-width: 235px;', delay: 340 },
-  { src: '/images/Proof of Work/ai-invoice-manager/home.webp',             alt: 'AI invoice manager',           depth: 110, pos: 'left: 8%;  bottom: 6%; width: 15vw; max-width: 205px;', delay: 460 },
-  { src: '/images/Proof of Work/nail-salon-website 2/home.webp',           alt: 'Salon booking platform',       depth: 40,  pos: 'right: 7%; bottom: 9%; width: 14vw; max-width: 190px;', delay: 560 },
+interface Props {
+  hasSource: boolean;
+}
+
+const { hasSource } = Astro.props;
+
+const plate = sites[0];
+
+// One row per numbered section; the CSS counter renumbers itself exactly as the section counter does
+const contents: { href: string; name: string; datum?: string }[] = [
+  { href: '#work', name: 'Work', datum: `${counts.projects} projects` },
+  { href: '#sites', name: 'Sites', datum: `${counts.sites} websites` },
+  { href: '#ventures', name: 'Ventures', datum: 'Axiom' },
+  { href: '#about', name: 'About' },
+  { href: '#drive', name: 'Drive', datum: 'play the CV' },
+  ...(hasSource ? [{ href: '#open-source', name: 'Source' }] : []),
+  { href: '#contact', name: 'Contact' },
 ];
 ---
 
 <section id="top" class="hero">
-  <div class="hero-aurora" aria-hidden="true"></div>
-  <div class="hero-grid" aria-hidden="true"></div>
-
-  <!-- Depth layer: screenshots drifting behind the headline -->
-  <div class="hero-floaters" aria-hidden="true">
-    {
-      floaters.map((f) => (
-        <figure class="floater reveal-blur scroll-parallax" style={`${f.pos} --depth:${f.depth}px; --d:${f.delay}ms;`}>
-          <img src={f.src} alt={f.alt} loading="eager" decoding="async" />
-        </figure>
-      ))
-    }
-  </div>
-
-  <div class="hero-body shell scroll-recede">
-    <p class="t-eyebrow reveal">Full-stack engineer &middot; AI &middot; South Africa</p>
-
-    <h1 class="t-display t-shine reveal-zoom" style="--d:90ms">Brandon van Vuuren</h1>
-
-    <p class="t-lede hero-lede reveal" style="--d:520ms">
-      I build systems that ship. React and .NET on the front, Python and AI on the
-      inside. Running in production, not in a slide deck.
-    </p>
-
-    <div class="hero-actions reveal" style="--d:640ms">
-      <CvGameButton />
-      <a class="btn btn-ghost" href="/assets/CV Brandon van Vuuren.pdf" target="_blank" rel="noopener">
-        Read the PDF instead
-      </a>
+  <div class="wrap">
+    <div class="hero-mast mono">
+      <p class="hero-cell"><span data-load>Portfolio {year}</span></p>
+      <p class="hero-cell hero-cell--place"><span data-load>Vanderbijlpark, South Africa</span></p>
+      <p class="hero-cell hero-cell--role"><span data-load>Full-stack engineer &middot; AI</span></p>
+      <i class="hero-rule" data-load></i>
     </div>
 
-    <dl class="hero-stats reveal" style="--d:760ms">
-      <div><dt>5+</dt><dd>Years shipping</dd></div>
-      <div><dt>25+</dt><dd>Projects delivered</dd></div>
-      <div><dt>10k/s</dt><dd>Events streamed</dd></div>
-    </dl>
-  </div>
+    <h1 class="t-cover" data-load>
+      <span class="ln-mask"><span class="ln">Brandon</span></span>
+      <span class="ln-mask"><span class="ln">van Vuuren</span></span>
+    </h1>
 
-  <a class="hero-scroll" href="#work" aria-label="Scroll to work">
-    <span></span>
-  </a>
+    <nav class="hero-toc" aria-label="Contents">
+      <p class="hero-toc-label mono"><span data-load>Contents</span></p>
+      <ol role="list">
+        {
+          contents.map((row) => (
+            <li>
+              <i data-load />
+              <a href={row.href}>
+                <span class="hero-row" data-load>
+                  <span class="hero-no mono-data" />
+                  <span class="hero-name">{row.name}</span>
+                  <span class="hero-leader" aria-hidden="true" />
+                  {row.datum && <span class="hero-datum mono-data">{row.datum}</span>}
+                </span>
+              </a>
+            </li>
+          ))
+        }
+      </ol>
+    </nav>
+
+    <div class="hero-lede">
+      <p class="t-standfirst" data-load>
+        Full-stack and AI engineer in Vanderbijlpark, South Africa. I build and migrate production software, from ASP.NET Framework to .NET 8, through streaming back ends and applied AI. <span class="hero-keep">{counts.projects} projects</span> and <span class="hero-keep">{counts.sites} client</span> websites follow.
+      </p>
+      <p class="hero-cv">
+        <a class="link" href={cv.href} target="_blank" rel="noopener" data-load>
+          CV, PDF {cv.kb} KB<Arrow dir="down" />
+        </a>
+      </p>
+    </div>
+
+    <figure class="hero-fig">
+      <div class="plate" data-load>
+        <img
+          src={plate.card}
+          width="900"
+          height="563"
+          loading="eager"
+          decoding="async"
+          alt={`${plate.name} website`}
+        />
+      </div>
+      <figcaption class="t-caption" data-load>Plate 1. {plate.name}</figcaption>
+    </figure>
+  </div>
 </section>
 
 <style>
   .hero {
-    position: relative;
-    min-height: 100svh;
-    display: grid;
-    align-items: center;
-    padding-block: 7rem 5rem;
-    overflow: hidden;
-    isolation: isolate;
+    padding-top: clamp(5.5rem, 7vw, 7rem);
+    padding-bottom: clamp(5rem, 9vw, 9rem);
   }
 
-  /* Slow-breathing blue aurora, Apple's Pro-page background trick */
-  .hero-aurora {
-    position: absolute;
-    inset: -30% -10% auto;
-    height: 120%;
-    z-index: -3;
-    background:
-      radial-gradient(45% 40% at 22% 28%, rgba(41, 151, 255, 0.28), transparent 70%),
-      radial-gradient(40% 38% at 78% 22%, rgba(120, 80, 255, 0.2), transparent 72%),
-      radial-gradient(55% 45% at 50% 82%, rgba(0, 200, 255, 0.14), transparent 72%);
-    filter: blur(24px);
-    animation: drift 22s var(--ease) infinite alternate;
+  /* ---- Row A: masthead ---- */
+  .hero-mast {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    column-gap: var(--gap);
+    margin-bottom: 1.5rem;
   }
-  @keyframes drift {
-    to {
-      transform: translate3d(0, -5%, 0) scale(1.12);
-    }
-  }
-
-  /* Faint engineering grid, fading out towards the edges */
-  .hero-grid {
-    position: absolute;
-    inset: 0;
-    z-index: -2;
-    background-image:
-      linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-    background-size: 68px 68px;
-    mask-image: radial-gradient(ellipse 75% 60% at 50% 42%, #000 20%, transparent 78%);
-  }
-
-  .hero-floaters {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    display: none;
-  }
-
-  .floater {
-    position: absolute;
+  .hero-cell {
     margin: 0;
-    border-radius: 14px;
-    overflow: hidden;
-    border: 1px solid var(--hairline);
-    box-shadow: 0 30px 70px -28px rgba(0, 0, 0, 0.95);
-    opacity: 0;
+    overflow: clip;
   }
-  /* reveal-blur lands them at 0.55 rather than full: they are scenery, not content */
-  .floater.is-in {
-    opacity: 0.55;
-  }
-  .floater img {
+  .hero-cell > span {
     display: block;
-    width: 100%;
-    aspect-ratio: 16 / 10;
-    object-fit: cover;
-    object-position: top left;
+  }
+  .hero-rule {
+    flex-basis: 100%;
+    height: 1px;
+    margin-top: 0.75rem;
+    background: var(--rule-strong);
   }
 
-  .hero-body {
+  /* ---- Row B: the cover ---- */
+  /* display is left alone on purpose: site.css makes a parent of .ln-mask a flex column */
+  .hero h1 {
+    margin: 0 0 2rem;
+  }
+
+  .hero-toc {
+    margin-bottom: 2.5rem;
+  }
+  .hero-toc-label {
+    margin: 0 0 0.5rem;
+    overflow: clip;
+  }
+  .hero-toc-label > span {
+    display: block;
+  }
+  .hero-toc ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: toc;
+  }
+  .hero-toc li {
     position: relative;
-    text-align: center;
-    display: grid;
-    justify-items: center;
-    gap: 1.4rem;
+    counter-increment: toc;
   }
-
-  .hero-body h1 {
-    margin: 0;
-    max-width: 14ch;
-  }
-
-  .hero-lede {
-    max-width: 44ch;
-    margin: 0;
-    text-wrap: balance;
-  }
-
-  .hero-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    gap: 0.85rem;
-    margin-top: 0.4rem;
-  }
-
-  .hero-stats {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: clamp(1.5rem, 5vw, 3.5rem);
-    margin: 2.5rem 0 0;
-    padding-top: 1.75rem;
-    border-top: 1px solid var(--hairline);
-    width: min(100%, 620px);
-  }
-  .hero-stats div {
-    display: grid;
-    gap: 0.2rem;
-  }
-  .hero-stats dt {
-    font-size: clamp(1.5rem, 3vw, 2rem);
-    font-weight: 650;
-    letter-spacing: -0.03em;
-    color: var(--text);
-  }
-  .hero-stats dd {
-    margin: 0;
-    font-size: 0.8125rem;
-    color: var(--text-dim);
-    letter-spacing: -0.005em;
-  }
-
-  .hero-scroll {
+  .hero-toc li > i {
     position: absolute;
-    bottom: 1.75rem;
-    left: 50%;
-    translate: -50% 0;
-    width: 22px;
-    height: 34px;
-    border: 1px solid var(--hairline-strong);
-    border-radius: 12px;
-    display: grid;
-    justify-items: center;
-    padding-top: 6px;
+    inset: 0 0 auto;
+    height: 1px;
+    background: var(--rule);
   }
-  .hero-scroll span {
-    width: 2px;
-    height: 6px;
-    border-radius: 2px;
-    background: var(--text-muted);
-    animation: wheel 1.9s var(--ease) infinite;
+  .hero-toc a {
+    display: block;
+    overflow: clip;
   }
-  @keyframes wheel {
-    50% {
-      transform: translateY(10px);
-      opacity: 0.2;
+  .hero-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding-block: 0.8125rem;
+    font-size: 1.1875rem;
+    line-height: 1.3;
+  }
+  .hero-no::before {
+    content: counter(toc, decimal-leading-zero);
+  }
+  .hero-leader {
+    flex: 1;
+    min-width: 1rem;
+    border-bottom: 1px dotted var(--rule-strong);
+  }
+  .hero-no,
+  .hero-datum {
+    transition: color 0.3s;
+  }
+  @media (hover: hover) {
+    .hero-toc a:hover :is(.hero-no, .hero-datum) {
+      color: var(--paper);
+    }
+  }
+  .hero-toc a:focus-visible :is(.hero-no, .hero-datum) {
+    color: var(--paper);
+  }
+
+  /* ---- Row C ---- */
+  .hero-lede {
+    margin-bottom: 2.5rem;
+  }
+  .hero-cv {
+    margin: 1.75rem 0 0;
+    font-size: 1.125rem;
+  }
+
+  .hero-fig {
+    margin: 0;
+    max-width: 34rem;
+  }
+  .hero-fig .plate {
+    aspect-ratio: 900 / 563;
+  }
+  .hero-fig figcaption {
+    margin-top: 0.75rem;
+    color: var(--paper-2);
+  }
+
+  .hero-keep {
+    white-space: nowrap;
+  }
+
+  /* Phones: the masthead sets two mono lines, role beside the issue, place below */
+  @media (max-width: 899px) {
+    .hero-cell--role {
+      order: 2;
+    }
+    .hero-cell--place {
+      order: 3;
+      flex-basis: 100%;
+    }
+    .hero-rule {
+      order: 4;
     }
   }
 
-  @media (min-width: 1100px) {
-    .hero-floaters {
+  /* Tablet and laptop: masthead on three columns, contents on two, standfirst and plate side by side */
+  @media (min-width: 900px) {
+    .hero-mast {
+      display: grid;
+      grid-column: 1 / -1;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      margin-bottom: 2rem;
+    }
+    .hero-cell {
+      grid-column: span 4;
+    }
+    .hero-cell--role {
+      text-align: right;
+    }
+    .hero-rule {
+      grid-column: 1 / -1;
+    }
+    .hero h1,
+    .hero-toc {
+      grid-column: 1 / -1;
+    }
+    .hero-toc ol {
+      display: grid;
+      grid-template-rows: repeat(4, auto);
+      grid-auto-flow: column;
+      column-gap: var(--gap);
+    }
+    .hero-lede {
+      grid-column: 1 / span 6;
+      margin: 0;
+    }
+    .hero-fig {
+      grid-column: 7 / -1;
+      max-width: none;
+    }
+  }
+
+  /* The cover. Contents sit beside line one only: 'van Vuuren' is wider than cols 1-8 and its last
+     letter stands just under the list, so the row pitch is tied to the type size and the list rises
+     to the cap height of line one. The last row ends 24px or more above the ink of that letter at
+     every width from 1500px. Below 1500px the pitch would fall under the 1.3 line box, so the list
+     stays under the name instead. */
+  @media (min-width: 1500px) {
+    .hero h1 {
+      grid-area: 2 / 1 / 3 / -1;
+      margin-bottom: 3rem;
+    }
+    .hero-toc {
+      grid-area: 2 / 9 / 3 / -1;
+      align-self: start;
+      position: relative;
+      z-index: 2;
+      margin: calc(var(--t-cover) * -0.058) 0 0;
+    }
+    .hero-toc ol {
       display: block;
+    }
+    .hero-row {
+      font-size: 1.0625rem;
+      padding-block: calc((var(--t-cover) * 0.13 - 6px - 1.3em) / 2);
+    }
+    .hero-lede {
+      grid-area: 3 / 1 / 4 / 6;
+    }
+    .hero-fig {
+      grid-area: 3 / 9 / 4 / -1;
     }
   }
 </style>

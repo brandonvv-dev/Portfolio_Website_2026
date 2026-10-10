@@ -1,149 +1,125 @@
 ---
-import CvGameButton from './CvGameButton.astro';
+import Arrow from './Arrow.astro';
+import Folio from './Folio.astro';
+import FlowingMenu from './bits/FlowingMenu';
+import type { MenuItemData } from './bits/FlowingMenu';
+import { cv, email, year } from '../utils/site';
 
-const email = 'brandon.vanvuuren60@gmail.com';
-
-const channels = [
-  { label: 'Email', value: email, href: `mailto:${email}` },
-  { label: 'GitHub', value: 'brandonvv-dev', href: 'https://github.com/brandonvv-dev' },
-  { label: 'LinkedIn', value: 'brandon-van-vuuren', href: 'https://www.linkedin.com/in/brandon-van-vuuren-9616841b6' },
+const rows: MenuItemData[] = [
+  { text: 'Email', meta: email, link: `mailto:${email}` },
+  { text: 'GitHub', meta: 'github.com/brandonvv-dev', link: 'https://github.com/brandonvv-dev', external: true },
+  {
+    text: 'LinkedIn',
+    meta: 'linkedin.com/in/brandon-van-vuuren',
+    link: 'https://www.linkedin.com/in/brandon-van-vuuren-9616841b6',
+    external: true,
+  },
+  { text: 'CV', meta: `PDF, ${cv.kb} KB`, link: cv.href, external: true },
 ];
 ---
 
-<section id="contact" class="contact">
-  <div class="shell contact-inner">
-    <p class="t-eyebrow reveal">Contact</p>
+<section id="contact" class="sec contact" data-folio="Contact">
+  <Folio name="Contact" datum="Vanderbijlpark, ZA" />
 
-    <h2 class="t-headline t-shine reveal" style="--d:80ms">
-      Got something that<br />needs building?
-    </h2>
-
-    <p class="t-lede contact-lede reveal" style="--d:160ms">
-      Fast turnaround, clean code, and a straight answer about what it&rsquo;ll take.
+  <div class="wrap">
+    <h2 class="t-statement contact-head" data-split>Start a conversation.</h2>
+    <p class="t-body contact-note" data-split>
+      Based in Vanderbijlpark, South Africa. Email is the quickest way to start a project.
     </p>
 
-    <div class="contact-actions reveal" style="--d:240ms">
-      <a class="btn btn-primary" href={`mailto:${email}`}>Start a conversation</a>
-      <CvGameButton size="md" />
+    <div class="contact-menu">
+      <FlowingMenu
+        client:visible={{ rootMargin: '400px' }}
+        items={rows}
+        label="Contact channels"
+        speed={22}
+        textColor="var(--paper)"
+        bgColor="transparent"
+        marqueeBgColor="var(--accent)"
+        marqueeTextColor="var(--ink-0)"
+        borderColor="var(--rule)"
+      />
     </div>
-
-    <ul class="channels">
-      {
-        channels.map((c, i) => (
-          <li class="reveal" style={`--d:${300 + i * 80}ms`}>
-            <a href={c.href} target={c.href.startsWith('mailto') ? undefined : '_blank'} rel="noopener">
-              <span class="channel-label">{c.label}</span>
-              <span class="channel-value">{c.value}</span>
-              <span class="channel-arrow" aria-hidden="true">›</span>
-            </a>
-          </li>
-        ))
-      }
-    </ul>
   </div>
 
-  <footer class="foot">
-    <div class="shell foot-inner">
-      <p>© {new Date().getFullYear()} Brandon van Vuuren</p>
-      <p><a href="/drive">Drive the CV</a> · <a href="/assets/CV Brandon van Vuuren.pdf" target="_blank" rel="noopener">PDF version</a></p>
+  <footer class="wrap colophon">
+    <p class="mono-data">
+      Set in Newsreader and IBM Plex Mono. Built with Astro and GSAP. Grain, billboard wall, text reveal and contact
+      menu adapted from React Bits.
+    </p>
+    <p class="mono-data colophon-mid">Brandon van Vuuren, Vanderbijlpark, South Africa</p>
+    <div class="mono-data colophon-end">
+      <p>&copy; {year}</p>
+      <a class="link" href="#top">Back to top <Arrow dir="up" /></a>
     </div>
   </footer>
 </section>
 
 <style>
-  .contact {
-    border-top: 1px solid var(--hairline);
-    background:
-      radial-gradient(60% 60% at 50% 0%, rgba(41, 151, 255, 0.14), transparent 70%),
-      var(--bg);
+  .sec.contact {
+    padding-bottom: clamp(2rem, 4vw, 3rem);
   }
 
-  .contact-inner {
-    padding-block: clamp(5rem, 12vw, 9rem) clamp(4rem, 8vw, 6rem);
+  .contact-note {
+    margin: 1.5rem 0 0;
+    color: var(--paper-2);
+    text-wrap: balance;
+  }
+  .contact-head {
+    margin: 0;
+  }
+
+  /* The box is sized before the island hydrates, so nothing moves when it does */
+  .contact-menu {
+    --row-h: 96px;
+    height: calc(4 * var(--row-h));
+    margin-top: clamp(3rem, 6vw, 6rem);
+  }
+
+  .colophon {
+    margin-top: clamp(4rem, 8vw, 7rem);
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    row-gap: 1rem;
+  }
+  .colophon p {
+    margin: 0;
+  }
+  .colophon-end {
     display: grid;
-    gap: 1.1rem;
-    justify-items: center;
-    text-align: center;
+    row-gap: 0.5rem;
+    justify-items: start;
   }
-  .contact-inner h2 {
-    margin: 0;
-  }
-  .contact-lede {
-    margin: 0;
-    max-width: 46ch;
+  .colophon-end .link {
+    color: var(--paper);
   }
 
-  .contact-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    gap: 0.85rem;
-    margin-top: 0.75rem;
+  @media (min-width: 600px) {
+    .contact-menu {
+      --row-h: clamp(88px, 17vh, 168px);
+    }
   }
 
-  .channels {
-    list-style: none;
-    margin: clamp(2.5rem, 6vw, 4rem) 0 0;
-    padding: 0;
-    width: min(100%, 620px);
-    text-align: left;
-  }
-  .channels li:first-child a {
-    border-top: 1px solid var(--hairline);
-  }
-  .channels a {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1.15rem 0.25rem;
-    border-bottom: 1px solid var(--hairline);
-    text-decoration: none;
-    color: var(--text);
-    transition: padding-inline 0.3s var(--ease), color 0.3s var(--ease);
-  }
-  .channels a:hover {
-    padding-inline: 0.75rem 0;
-    color: var(--accent);
-  }
-  .channel-label {
-    font-size: 0.8125rem;
-    color: var(--text-dim);
-    width: 5.5rem;
-    flex: 0 0 auto;
-  }
-  .channel-value {
-    font-size: 1rem;
-    font-weight: 500;
-    letter-spacing: -0.012em;
-    word-break: break-all;
-  }
-  .channel-arrow {
-    margin-left: auto;
-    color: var(--text-dim);
-    font-size: 1.25rem;
-  }
+  @media (min-width: 900px) {
+    .contact-head,
+    .contact-note {
+      grid-column: 1 / 6;
+    }
+    .contact-menu {
+      grid-column: 1 / -1;
+    }
 
-  .foot {
-    border-top: 1px solid var(--hairline);
-    padding-block: 1.75rem;
-  }
-  .foot-inner {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 0.75rem;
-    font-size: 0.75rem;
-    color: var(--text-dim);
-  }
-  .foot-inner p {
-    margin: 0;
-  }
-  .foot-inner a {
-    color: var(--text-muted);
-    text-decoration: none;
-  }
-  .foot-inner a:hover {
-    color: var(--accent);
+    .colophon > :nth-child(1) {
+      grid-column: 1 / 5;
+    }
+    .colophon-mid {
+      grid-column: 5 / 9;
+      text-align: center;
+    }
+    .colophon-end {
+      grid-column: 9 / 13;
+      justify-items: end;
+      text-align: right;
+    }
   }
 </style>

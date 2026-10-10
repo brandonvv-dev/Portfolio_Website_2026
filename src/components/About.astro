@@ -1,303 +1,198 @@
 ---
-import CvGameButton from './CvGameButton.astro';
+import Arrow from './Arrow.astro';
+import Folio from './Folio.astro';
+import ScrollReveal from './bits/ScrollReveal';
+import { cv } from '../utils/site';
 
-/**
- * Portrait slot. Drop the real photo at this path when the asset folder lands;
- * until then the frame renders with the placeholder gradient behind it.
- */
-const portrait = '/images/profile/portrait.webp';
-
-const stack = [
-  'react', 'nextdotjs', 'typescript', 'dotnet', 'cplusplus', 'python',
-  'astro', 'nodedotjs', 'postgresql', 'docker', 'apachekafka', 'pytorch',
-  'tailwindcss', 'redis', 'fastapi', 'git',
-];
+const statement =
+  'I work across React, Next.js, Node, Python, C# and C++, with a deep seam in ASP.NET migration and a working practice in applied AI. The common thread is maintainability: clear boundaries, honest error handling, and code the next person can read at 3am without a guide.';
 
 const chapters = [
   {
-    year: 'Now',
     title: 'Full-stack & AI engineering',
-    body: 'Building production systems end to end — modern frontends, scalable APIs, and models wired into features people actually press buttons on.',
+    body: 'Building production systems end to end: modern frontends, scalable APIs, and models wired into features people actually press buttons on.',
   },
   {
-    year: 'Platform',
-    title: '.NET Framework 4 → .NET 8',
+    title: '.NET Framework 4',
+    to: '.NET 8',
     body: 'Migrating legacy ASP.NET estates onto modern .NET with strict architecture standards: clear boundaries, testable seams, no rewrite-by-vibes.',
   },
   {
-    year: 'Data',
     title: 'Streaming at 10k events/sec',
     body: 'Kafka pipelines feeding real-time dashboards, with anomaly detection and alerting that holds up under load rather than in a demo.',
   },
   {
-    year: 'AI',
     title: 'Fine-tuning that pays for itself',
-    body: 'LoRA/QLoRA pipelines with automated evaluation — 60% lower training cost, measured, not claimed.',
+    body: 'LoRA/QLoRA pipelines with automated evaluation and a measured 60% lower training cost.',
   },
+];
+
+const stack = [
+  'React', 'Next.js', 'TypeScript', '.NET', 'C++', 'Python', 'Astro', 'Node.js',
+  'PostgreSQL', 'Docker', 'Apache Kafka', 'PyTorch', 'Tailwind CSS', 'Redis', 'FastAPI', 'Git',
 ];
 ---
 
-<section id="about" class="about">
-  <div class="shell about-grid">
-    <!-- Portrait column: pinned, drifting, framed -->
-    <div class="about-portrait-col">
-      <figure class="portrait reveal-blur glow">
+<section id="about" class="sec" data-folio="About">
+  <h2 class="sr-only">About</h2>
+  <Folio name="About" datum="Full-stack and AI" />
+
+  <div class="wrap">
+    <figure class="portrait">
+      <div class="plate" data-plate>
         <img
-          src={portrait}
+          src="/images/profile/portrait.webp"
           alt="Brandon van Vuuren"
+          width="600"
+          height="800"
           loading="lazy"
           decoding="async"
-          onerror="this.closest('.portrait').dataset.empty=''"
         />
-        <figcaption>
-          <strong>Brandon van Vuuren</strong>
-          <span>Vanderbijlpark, South&nbsp;Africa</span>
-        </figcaption>
-      </figure>
-
-      <div class="portrait-badges" aria-hidden="true">
-        <span class="badge scroll-parallax" style="--depth:34px">Ships to prod</span>
-        <span class="badge scroll-parallax" style="--depth:-28px">Reads the stack trace</span>
       </div>
+      <figcaption class="t-caption" data-rise>Brandon van Vuuren, Vanderbijlpark</figcaption>
+    </figure>
+
+    <div class="statement">
+      <ScrollReveal client:visible={{ rootMargin: '800px' }} text={statement} className="t-statement" />
     </div>
 
-    <!-- Copy column -->
-    <div class="about-copy">
-      <p class="t-eyebrow reveal">About</p>
-      <h2 class="t-headline t-shine reveal" style="--d:80ms">
-        Engineer first.<br />Everything else after.
-      </h2>
-
-      <p class="t-lede reveal" style="--d:160ms">
-        I build systems that survive contact with real users, real data and real
-        deadlines.
-      </p>
-
-      <p class="t-body reveal" style="--d:220ms">
-        I work across React, Next.js, Node, Python, C# and C++, with a deep seam in
-        ASP.NET migration and a working practice in applied AI. The common thread
-        is maintainability: clear boundaries, honest error handling, and code the
-        next person can read at 3am without a guide.
-      </p>
-
-      <ol class="chapters">
-        {
-          chapters.map((c, i) => (
-            <li class="chapter reveal" style={`--d:${260 + i * 90}ms`}>
-              <span class="chapter-year">{c.year}</span>
-              <div>
-                <h3>{c.title}</h3>
-                <p>{c.body}</p>
-              </div>
-            </li>
-          ))
-        }
-      </ol>
-
-      <div class="about-cta reveal">
-        <CvGameButton size="md" />
-        <a class="link-arrow" href="/assets/CV Brandon van Vuuren.pdf" target="_blank" rel="noopener">
-          Download the CV
-        </a>
-      </div>
-    </div>
-  </div>
-
-  <!-- Infinite stack marquee: two identical halves, CSS shifts by -50% -->
-  <div class="strip" aria-label="Technology stack">
-    <div class="marquee" style="--speed:48s">
+    <ol class="chapters">
       {
-        [...stack, ...stack].map((s) => (
-          <span class="chip">
-            <img src={`https://cdn.simpleicons.org/${s}/8e8e93`} alt="" width="18" height="18" loading="lazy" />
-            {s}
-          </span>
+        chapters.map((chapter, i) => (
+          <li>
+            <i data-rule></i>
+            <div class="row" data-rise>
+              <h3 class="mono chapter-title">
+                <span class="chapter-no">{String(i + 1).padStart(2, '0')}</span>
+                <span>
+                  {chapter.title}
+                  {chapter.to && (
+                    <>
+                      {' '}
+                      <span class="sr-only">to</span>
+                      {' '}
+                      <span class="nowrap">
+                        <Arrow dir="right" />
+                        {' '}
+                        {chapter.to}
+                      </span>
+                    </>
+                  )}
+                </span>
+              </h3>
+              <p class="t-body">{chapter.body}</p>
+            </div>
+          </li>
         ))
       }
+    </ol>
+
+    <div class="stack">
+      <i data-rule></i>
+      <div class="row" data-rise>
+        <p class="mono">Stack</p>
+        <div>
+          <p class="mono-data stack-list">
+            {
+              stack.map((name, i) => (
+                <Fragment>
+                  <span class="nowrap">
+                    {name}
+                    {i < stack.length - 1 && ' /'}
+                  </span>
+                  {i < stack.length - 1 && ' '}
+                </Fragment>
+              ))
+            }
+          </p>
+          <p class="t-body cv">
+            <a class="link" href={cv.href} target="_blank" rel="noopener">
+              CV, PDF {cv.kb} KB<Arrow dir="down" />
+            </a>
+          </p>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
 <style>
-  .about {
-    padding-block: clamp(5rem, 12vw, 9rem) 0;
-    border-top: 1px solid var(--hairline);
-  }
-
-  .about-grid {
-    display: grid;
-    gap: clamp(2.5rem, 6vw, 4.5rem);
-    align-items: start;
-  }
-
-  .about-portrait-col {
-    position: relative;
-  }
-
+  /* Phone: the portrait sits above the statement at 40 percent of the measure */
   .portrait {
-    position: relative;
-    margin: 0;
-    border-radius: 24px;
-    overflow: hidden;
-    border: 1px solid var(--hairline);
-    /* Placeholder shows through if the portrait file isn't there yet */
-    background:
-      radial-gradient(70% 60% at 50% 20%, rgba(41, 151, 255, 0.35), transparent 70%),
-      linear-gradient(180deg, #1b1b1f, #0b0b0d);
-    aspect-ratio: 4 / 5;
+    width: 40%;
+    margin-bottom: clamp(2.5rem, 10vw, 4rem);
   }
-  .portrait img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
+  .portrait .plate {
+    aspect-ratio: 3 / 4;
   }
-  .portrait[data-empty] img {
-    display: none;
-  }
-  .portrait[data-empty]::after {
-    content: 'portrait.webp';
-    position: absolute;
-    inset: auto 0 45%;
-    text-align: center;
-    font-size: 0.75rem;
-    color: var(--text-dim);
-    letter-spacing: 0.04em;
-  }
-
   .portrait figcaption {
-    position: absolute;
-    inset: auto 0 0;
-    display: grid;
-    gap: 0.15rem;
-    padding: 3.5rem 1.25rem 1.25rem;
-    background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
-  }
-  .portrait figcaption strong {
-    font-size: 1.0625rem;
-    font-weight: 600;
-    letter-spacing: -0.015em;
-  }
-  .portrait figcaption span {
-    font-size: 0.8125rem;
-    color: var(--text-muted);
-  }
-
-  .portrait-badges {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-  .badge {
-    position: absolute;
-    padding: 0.45rem 0.85rem;
-    border-radius: 980px;
-    font-size: 0.75rem;
-    font-weight: 550;
-    color: var(--text);
-    background: rgba(20, 20, 22, 0.82);
-    border: 1px solid var(--hairline-strong);
-    backdrop-filter: blur(12px);
-    white-space: nowrap;
-  }
-  .badge:first-child {
-    top: 12%;
-    right: -6%;
-  }
-  .badge:last-child {
-    bottom: 18%;
-    left: -8%;
-  }
-
-  .about-copy {
-    display: grid;
-    gap: 1.1rem;
-    align-content: start;
-  }
-  .about-copy h2,
-  .about-copy p {
-    margin: 0;
-  }
-  .about-copy > p {
-    max-width: 56ch;
+    margin-top: 0.75rem;
+    color: var(--paper-2);
   }
 
   .chapters {
-    list-style: none;
-    margin: 1.5rem 0 0;
-    padding: 0;
-    display: grid;
-    gap: 0;
+    margin-top: clamp(4rem, 8vw, 8rem);
   }
-  .chapter {
-    display: grid;
-    grid-template-columns: 5.5rem 1fr;
-    gap: 1rem;
-    padding: 1.25rem 0;
-    border-top: 1px solid var(--hairline);
-  }
-  .chapter:last-child {
-    border-bottom: 1px solid var(--hairline);
-  }
-  .chapter-year {
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--accent);
-    padding-top: 0.2rem;
-  }
-  .chapter h3 {
-    margin: 0 0 0.3rem;
-    font-size: 1.0625rem;
-    font-weight: 600;
-    letter-spacing: -0.015em;
-  }
-  .chapter p {
-    margin: 0;
-    font-size: 0.9375rem;
-    line-height: 1.55;
-    color: var(--text-muted);
-    max-width: 52ch;
+  .chapters > li > i,
+  .stack > i {
+    display: block;
+    height: 1px;
+    background: var(--rule);
   }
 
-  .about-cta {
+  .row {
+    display: grid;
+    row-gap: 0.75rem;
+    padding-block: 1.5rem 2rem;
+  }
+
+  .chapter-title {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 1.25rem;
+    column-gap: 1.25em;
+    color: var(--paper);
+  }
+  .chapter-no {
+    flex: none;
+    color: var(--paper-3);
+  }
+
+  .stack-list {
+    max-width: 62ch;
+    line-height: 1.7;
+    color: var(--paper-2);
+    text-wrap: pretty;
+  }
+  .nowrap {
+    white-space: nowrap;
+  }
+  .cv {
     margin-top: 1.5rem;
   }
 
-  .strip {
-    margin-top: clamp(4rem, 9vw, 7rem);
-    padding-block: 1.5rem;
-    border-block: 1px solid var(--hairline);
-    overflow: hidden;
-    mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
-  }
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding-inline: 1.25rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--text-dim);
-    text-transform: capitalize;
-    white-space: nowrap;
-  }
-  .chip img {
-    opacity: 0.8;
-  }
-
-  @media (min-width: 950px) {
-    .about-grid {
-      grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  @media (min-width: 900px) {
+    .portrait {
+      grid-column: 1 / 4;
+      grid-row: 1 / span 3;
+      width: 100%;
+      margin-bottom: 0;
     }
-    .about-portrait-col {
-      position: sticky;
-      top: 6rem;
+    .statement,
+    .chapters,
+    .stack {
+      grid-column: 4 / -1;
+    }
+
+    /* Nine equal columns spanning cols 4 to 12: title on cols 4-6, body on cols 7-12 */
+    .row {
+      grid-template-columns: repeat(9, minmax(0, 1fr));
+      column-gap: var(--gap);
+      align-items: baseline;
+    }
+    .row > :first-child {
+      grid-column: 1 / 4;
+    }
+    .row > :last-child {
+      grid-column: 4 / -1;
     }
   }
 </style>

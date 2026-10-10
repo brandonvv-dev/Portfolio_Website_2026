@@ -1,509 +1,367 @@
-import * as THREE from 'three';
-import * as CANNON from 'cannon-es';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { Car, loadCarModel } from './car';
-import { buildWorld, type Board, type Spot } from './world';
-import { loadPropLibrary } from './props';
+/**
+ * The page entry: it builds the game behind the loading screen, runs the one frame function, and
+ * takes a visit through its three phases.
+ *
+ * Every rendered frame advances the physics by exactly that frame's time, cut into equal steps of
+ * at most 10 ms: one step a frame at 120 Hz and above, two at 60. Physics time is render time, so
+ * nothing is interpolated and nothing judders, and the car handles alike on every display.
+ *
+ * Whatever goes wrong, at any point, ends on the fallback screen with the CV as a PDF: a chunk
+ * that did not arrive, a throw in a frame, a GPU that took the context away.
+ */
+import { LoadingManager, Quaternion, Vector3 } from 'three';
+import { createCamera } from './camera';
+import { createCar } from './car';
+import { createCarBody } from './carBody';
+import { createTerrain } from './ground';
+import { createHud } from './hud';
 import { createInput } from './input';
-import { siteLinks } from '../data/site-links';
-import { createEffects } from './effects';
-import { matcapify } from './matcap';
+import { TEST, WORLD, assertLayout } from './layout';
+import { createPhysics } from './physics';
+import { createProps } from './props';
+import { createRender } from './render';
+import type {
+  BaseContext,
+  CarState,
+  GameContext,
+  GameModule,
+  GameState,
+  ModuleFactory,
+  Pad,
+  Tier,
+  ViewState,
+  WheelState,
+} from './types';
+import { createEvents, createStore } from './util';
 
-/** Swap for any other model in /public/models — it is measured, not assumed. */
-const CAR_MODEL = '/models/sedan-sports.glb';
-const CV_PDF = '/assets/CV Brandon van Vuuren.pdf';
+/**
+ * The content of the world, in frame order. Each name is a file in ./content that default-exports
+ * a ModuleFactory, and a name with no file is skipped: a module runs from the day it is written.
+ */
+const CONTENT = [
+  'scenery',
+  'signs',
+  'boards',
+  'structures',
+  'playground',
+  'grass',
+  'effects',
+  'confetti',
+  'audio',
+  'panels',
+  'directory',
+  'trial',
+  'chart',
+  'awards',
+];
 
-const SCENERY = [
-  'tree_default', 'tree_detailed', 'tree_oak', 'tree_blocks', 'tree_cone',
-  'tree_fat', 'tree_pineDefaultA', 'tree_pineRoundA', 'rock_largeA',
-  'rock_largeB', 'rock_smallA', 'rock_smallB', 'plant_bush', 'plant_bushLarge',
-  'grass', 'grass_large', 'flower_redA', 'flower_yellowA', 'flower_purpleA',
-  'log', 'log_stack', 'stump_round', 'stump_old', 'statue_obelisk',
-  'televisionModern',
-].map((n) => `/models/props/${n}.glb`);
+/**
+ * Lazy, so a file is fetched only when it is going to run: the test ground asks for none of them,
+ * and a half-saved module cannot break a page that left it out.
+ */
+const files = import.meta.glob<{ default: ModuleFactory }>('./content/*.ts');
 
-// These carry the car kit's colour atlas, so they load from beside the cars.
-const LITTER = ['cone', 'box', 'debris-tire'].map((n) => `/models/${n}.glb`);
+/**
+ * Where a slow device is remembered as low. The tab's storage and not the store: one slow moment
+ * must not downgrade a machine for ever.
+ */
+const TIER_KEY = 'drive:tier';
 
-const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
+/** Seconds a pad's panel stays up after the car has left the pad. */
+const DWELL = 3;
 
-/** Scratch for the collision point, reused rather than allocated per hit. */
-const IMPACT_AT = new THREE.Vector3();
+/** The markup is drive.astro's, so an element that is missing is a mistake there. */
+const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
 
 const canvas = $<HTMLCanvasElement>('[data-canvas]');
 const loading = $('[data-loading]');
-const progressBar = $('[data-progress]');
+const bar = $('[data-progress]');
 const intro = $('[data-intro]');
-const startBtn = $<HTMLButtonElement>('[data-start]');
+const startButton = $('[data-start]');
 const fallback = $('[data-fallback]');
 const hud = $('[data-hud]');
-const speedEl = $('[data-speed]');
-const scoreEl = $('[data-score]');
-const panel = $('[data-panel]');
-const stick = $('[data-stick]');
-const soundBtn = $<HTMLButtonElement>('[data-sound]');
-const resetBtn = $<HTMLButtonElement>('[data-reset]');
 
-/* ---------------------------------------------------------------- guard */
-if (!canvas.getContext('webgl2') && !canvas.getContext('webgl')) {
-  loading.hidden = true;
-  intro.hidden = true;
+const nextFrame = () => new Promise(requestAnimationFrame);
+
+function fail(reason: unknown): void {
+  console.error(reason);
+  loading.hidden = intro.hidden = hud.hidden = true;
   fallback.hidden = false;
-  throw new Error('WebGL unavailable');
 }
 
-async function boot() {
-  /* ------------------------------------------------------------- render */
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-    powerPreference: 'high-performance',
+function rememberedTier(): Tier | null {
+  try {
+    return sessionStorage.getItem(TIER_KEY) === 'low' ? 'low' : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Notes that this device is to start as low, and says whether the note will be there after a
+ * reload. Where the tab has no storage a reload would measure the same device, find it slow and
+ * reload again, for ever.
+ */
+function rememberLow(): boolean {
+  try {
+    sessionStorage.setItem(TIER_KEY, 'low');
+    return sessionStorage.getItem(TIER_KEY) === 'low';
+  } catch {
+    return false;
+  }
+}
+
+async function boot(): Promise<void> {
+  const params = new URLSearchParams(location.search);
+  // The switches below and the hook itself exist for the bench: no visitor's URL reaches them by
+  // accident, and without ?debug a production page never downloads debug.ts or the test ground.
+  const debug = import.meta.env.DEV || params.has('debug');
+  const asked = debug ? params.get('tier') : null;
+  const forced = asked === 'high' || asked === 'low' ? asked : null;
+  const testGround = debug && params.get('ground') === 'test';
+  const only = debug ? params.get('only')?.split(',') : undefined;
+
+  const render = createRender(canvas, forced ?? rememberedTier());
+  if (!render) throw new Error('drive: this browser has no WebGL 2');
+  const { renderer, scene, camera } = render;
+
+  canvas.addEventListener('webglcontextlost', (event) => {
+    event.preventDefault();
+    renderer.setAnimationLoop(null);
+    fail(new Error('drive: the WebGL context was lost'));
   });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1;
 
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 600);
-  camera.position.set(0, 10, 50);
+  // The bar follows the loaders, and a loader that has just been handed more to fetch reports
+  // less than it did: the bar keeps what it has shown. The last tenth is the settle and the
+  // warm-up, which load nothing.
+  let shown = 0;
+  const progress = (share: number) => {
+    if (share <= shown) return;
+    shown = share;
+    bar.style.transform = `scaleX(${share})`;
+  };
+  const manager = new LoadingManager();
+  manager.onProgress = (_url, loaded, total) => progress((0.9 * loaded) / total);
 
-  /* ------------------------------------------------------------ physics */
-  const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -24, 0) });
-  world.broadphase = new CANNON.SAPBroadphase(world);
-  world.allowSleep = true;
-  world.defaultContactMaterial.friction = 0.25;
+  const [rapier, hook] = await Promise.all([
+    // The game's only value import of Rapier, so the bundler gives its 2 MB a chunk of their own.
+    import('@dimforge/rapier3d-compat').then(async (module) => {
+      await module.init();
+      return module;
+    }),
+    debug ? import('./debug') : null,
+    // The weights the ground lettering and the signs are painted in. A canvas painted before its
+    // face has arrived keeps the fallback face for the session. A face that cannot be fetched is
+    // no reason to refuse the game.
+    document.fonts.load('800 1em Inter').catch(() => []),
+    document.fonts.load('600 1em Inter').catch(() => []),
+  ]);
 
-  const groundMaterial = new CANNON.Material('ground');
-  const carMaterial = new CANNON.Material('car');
-  // Only matters when the chassis itself scrapes: let it slide, not stick.
-  world.addContactMaterial(
-    new CANNON.ContactMaterial(carMaterial, groundMaterial, {
-      friction: 0.12,
-      restitution: 0.1,
-    })
-  );
+  const { world, physics, beginFrame, step, simTime, frameMs } = createPhysics(rapier);
 
-  /* -------------------------------------------------------------- build */
-  const manager = new THREE.LoadingManager();
-  manager.onProgress = (_url: string, loaded: number, total: number) => {
-    progressBar.style.transform = `scaleX(${total ? loaded / total : 0})`;
+  const wheel = (): WheelState => ({
+    contact: false,
+    point: new Vector3(),
+    length: 0,
+    spin: 0,
+    steer: 0,
+  });
+  const car: CarState = {
+    position: new Vector3(),
+    quaternion: new Quaternion(),
+    velocity: new Vector3(),
+    speed: 0,
+    forwardSpeed: 0,
+    yaw: 0,
+    upY: 1,
+    wheels: [wheel(), wheel(), wheel(), wheel()],
+    wheelsDown: 0,
+    airTime: 0,
+    groundY: 0,
+    slip: 0,
+    braking: false,
+    reversing: false,
+    boosting: false,
+  };
+  const view: ViewState = {
+    mode: 'iso',
+    focus: new Vector3(),
+    centre: new Vector3(),
+    radius: 0,
+    near: 0,
+    far: 0,
+    halfWidth: 0,
+  };
+  const state: GameState = { phase: 'loading', time: 0, pad: null, onPad: false, level: 0 };
+  const events = createEvents();
+  const store = createStore();
+  const input = createInput({ state, car, camera, events });
+  const props = createProps({ rapier, world, scene, car, events });
+  const places = testGround ? TEST : WORLD;
+  if (import.meta.env.DEV) assertLayout();
+
+  const base: BaseContext = {
+    rapier,
+    world,
+    physics,
+    props,
+    renderer,
+    scene,
+    camera,
+    look: render.look,
+    tier: render.tier,
+    quality: render.quality,
+    loading: manager,
+    places,
+    input,
+    car,
+    view,
+    state,
+    events,
+    store,
+  };
+  const ground = testGround ? (await import('./testground')).default : createTerrain;
+  const ctx: GameContext = { ...base, terrain: await ground(base) };
+
+  /** Seconds since the car was last on a pad. */
+  let away = 0;
+  const pads: GameModule = {
+    update(dt) {
+      let under: Pad | null = null;
+      for (let i = 0; i < places.pads.length && !under; i++) {
+        const { x, z, radius } = places.pads[i];
+        if ((x - car.position.x) ** 2 + (z - car.position.z) ** 2 < radius ** 2) {
+          under = places.pads[i];
+        }
+      }
+      state.onPad = under !== null;
+
+      // The panel outlives the pad, so a car that rolls off the edge can still be reading it.
+      away = under ? 0 : away + dt;
+      const pad = under ?? (away < DWELL ? state.pad : null);
+      if (pad !== state.pad) {
+        state.pad = pad;
+        events.emit('pad', pad);
+      }
+    },
   };
 
-  const textures = new THREE.TextureLoader(manager);
-  const gltf = new GLTFLoader(manager);
+  // The list is the frame order. A frame goes by after each build, so each is a task of its own
+  // and the loading screen keeps painting between them.
+  const modules: GameModule[] = [];
+  const build = async (factory: ModuleFactory) => {
+    modules.push(await factory(ctx));
+    await nextFrame();
+  };
+  await build(createCar);
+  await build(createCarBody);
+  modules.push({ update: () => props.sync() }, pads);
+  await build(createCamera);
+  modules.push(render.attach(ctx));
+  // Every import starts at once, and the builds follow in order.
+  const names = testGround
+    ? []
+    : CONTENT.filter((name) => `./content/${name}.ts` in files && (only?.includes(name) ?? true));
+  const content = await Promise.all(names.map((name) => files[`./content/${name}.ts`]()));
+  for (const { default: factory } of content) await build(factory);
+  await build(createHud);
 
-  const lib = await loadPropLibrary([...SCENERY, ...LITTER], gltf);
-  const bits = buildWorld(
-    scene,
-    world,
-    groundMaterial,
-    textures,
-    lib,
-    renderer.capabilities.getMaxAnisotropy()
-  );
-  const model = await loadCarModel(CAR_MODEL, gltf);
-  const car = new Car(world, carMaterial, model);
-  car.addTo(scene);
-  // The world converted itself on the way out; this catches the car, whose
-  // materials come from the GLB and arrive after the build.
-  matcapify(scene);
+  const instrument = hook?.installDebug(ctx, { render, props, simTime, frameMs });
 
-  // Tyre marks, dust, sparks and the blob shadow under the car.
-  const fx = createEffects(scene);
-
-  const input = createInput(stick);
-
-  loading.hidden = true;
-  intro.hidden = false;
-
-  /* --------------------------------------------------------------- audio */
-  let audio: AudioContext | null = null;
-  let engineGain: GainNode | null = null;
-  let engineOsc: OscillatorNode | null = null;
-  let soundOn = false;
-
-  function initAudio() {
-    if (audio) return;
-    audio = new AudioContext();
-    engineOsc = audio.createOscillator();
-    engineOsc.type = 'sawtooth';
-    engineOsc.frequency.value = 60;
-    engineGain = audio.createGain();
-    engineGain.gain.value = 0;
-    const filter = audio.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 460;
-    engineOsc.connect(filter).connect(engineGain).connect(audio.destination);
-    engineOsc.start();
-  }
-
-  function blip(freq: number, gain: number, seconds: number, type: OscillatorType) {
-    if (!audio || !soundOn) return;
-    const osc = audio.createOscillator();
-    const vol = audio.createGain();
-    osc.type = type;
-    osc.frequency.value = freq;
-    vol.gain.setValueAtTime(gain, audio.currentTime);
-    vol.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + seconds);
-    osc.connect(vol).connect(audio.destination);
-    osc.start();
-    osc.stop(audio.currentTime + seconds + 0.02);
-  }
-
-  const honk = () => blip(340, 0.09, 0.32, 'square');
-
-  // Impacts: pitch and level scale with how hard you hit the thing.
-  car.body.addEventListener('collide', (e: { contact: CANNON.ContactEquation }) => {
-    const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
-    if (v < 3) return;
-    const t = Math.min(v / 18, 1);
-    blip(90 + t * 150, 0.02 + t * 0.06, 0.09 + t * 0.08, 'triangle');
-
-    // Sparks fly off the contact itself, not the middle of the car. The
-    // contact point is stored relative to each body, so it needs the car's
-    // position added back on.
-    if (v < 7) return;
-    const r = e.contact.bi === car.body ? e.contact.ri : e.contact.rj;
-    IMPACT_AT.set(
-      car.body.position.x + r.x,
-      car.body.position.y + r.y,
-      car.body.position.z + r.z
-    );
-    for (let i = 0; i < 4 + Math.round(t * 10); i++)
-      fx.sparks(IMPACT_AT.x, IMPACT_AT.y, IMPACT_AT.z, t);
-  });
-
-  soundBtn.addEventListener('click', () => {
-    soundOn = !soundOn;
-    soundBtn.setAttribute('aria-pressed', String(soundOn));
-    soundBtn.textContent = soundOn ? 'Sound on' : 'Sound off';
-    if (soundOn) {
-      initAudio();
-      audio?.resume();
-    } else if (engineGain && audio) {
-      engineGain.gain.setTargetAtTime(0, audio.currentTime, 0.05);
+  // Props are authored standing and stepped until they sleep, a slice of 8 ms to a frame: a step
+  // to a frame would cost a phone four seconds.
+  let steps = 0;
+  let moving = true;
+  while (moving && steps < 240) {
+    const until = performance.now() + 8;
+    while (moving && steps < 240 && performance.now() < until) {
+      moving = props.settle();
+      steps++;
     }
-  });
+    await nextFrame();
+  }
+  await render.warmUp();
+  // Lost while loading: the fallback is already up, and there is nothing to run behind it.
+  if (renderer.getContext().isContextLost()) return;
 
-  resetBtn.addEventListener('click', () => car.reset());
-
-  /* --------------------------------------------------------------- panel */
-  // One renderer for every kind of pad. Keyed, so a panel is only rebuilt
-  // when what you are standing on actually changes.
-  let panelKey = '';
-
-  const setPanel = (key: string, html: string) => {
-    if (key === panelKey) return;
-    panelKey = key;
-    if (!key) {
-      panel.hidden = true;
-      panel.innerHTML = '';
+  /** The 45 frames the governor measures the display and the device on are over. */
+  const ready = () => {
+    if (render.tier === 'high' && !forced && render.slow && rememberLow()) {
+      renderer.setAnimationLoop(null);
+      location.reload();
       return;
     }
-    panel.hidden = false;
-    panel.innerHTML = html;
-
-    /**
-     * Every link out of the panel opens in a tab, whether it points at a
-     * client site or back at the portfolio. Following one in place unloads the
-     * page, which tears down the canvas and the physics world: come back and
-     * you are at the intro with the car on the start line again.
-     *
-     * Done here rather than on each anchor in the templates, so a link added
-     * later cannot forget. `download` is left alone because it never
-     * navigates, and mailto/tel are left alone because handing them a tab
-     * leaves a blank one sitting there.
-     */
-    for (const a of panel.querySelectorAll('a')) {
-      if (a.hasAttribute('download') || /^(mailto|tel):/i.test(a.getAttribute('href') ?? ''))
-        continue;
-      a.target = '_blank';
-      a.rel = 'noopener';
-    }
+    state.phase = 'intro';
+    progress(1);
+    loading.hidden = true;
+    intro.hidden = false;
+    // Enter and Space are a way in, too.
+    startButton.focus();
   };
 
-  /**
-   * The live URL for whatever the car is parked on, or null. Kept in a
-   * variable rather than read out of the panel markup because the E key
-   * handler below has to be able to answer instantly, inside the gesture.
-   */
-  let activeUrl: string | null = null;
+  // The game already runs behind the intro with no input, so Start only flips the phase. The
+  // emit is inside the click: the one gesture that may start the audio and the video.
+  startButton.addEventListener(
+    'click',
+    () => {
+      state.phase = 'driving';
+      events.emit('start');
+      intro.hidden = true;
+      hud.hidden = false;
+      canvas.focus();
+    },
+    { once: true },
+  );
 
-  const boardPanel = (b: Board) => {
-    const live = siteLinks[b.site.slug];
-    return `
-    <p class="panel-kicker">Site ${String(b.site.num).padStart(2, '0')} of 20</p>
-    <h2>${b.site.name}</h2>
-    <img class="panel-shot" src="${b.site.card}" alt="" loading="lazy" />
-    <div class="panel-links">
-      ${live ? `<a class="primary" href="${live}">View website &rsaquo;</a>` : ''}
-      <a class="muted" href="/#site-${b.site.slug}">All ${b.site.images.length} screens &rsaquo;</a>
-    </div>
-    ${live ? '<p class="panel-enter"><kbd>E</kbd> to open it</p>' : ''}`;
-  };
-
-  /**
-   * Drive onto something, press E, and you are there.
-   *
-   * Bound straight to keydown rather than polled through the input object in
-   * the animation frame: opening a tab from a rAF callback is a popup as far
-   * as the browser is concerned and gets blocked, whereas the keydown itself
-   * is a user gesture it will honour.
-   */
-  addEventListener('keydown', (e) => {
-    if (e.code !== 'KeyE' || !activeUrl || !running) return;
-    e.preventDefault();
-    // The email pad's link is a mailto: handing that to a new tab leaves a
-    // blank one behind, while setting it in place hands it to the mail client
-    // without unloading the game.
-    if (/^(mailto|tel):/i.test(activeUrl)) location.href = activeUrl;
-    else window.open(activeUrl, '_blank', 'noopener');
+  // Only noted: the frame fits the drawing buffer, once, before anything reads its size.
+  let resized = false;
+  addEventListener('resize', () => {
+    resized = true;
   });
 
-  const spotPanel = (s: Spot) => `
-    <p class="panel-kicker" style="color:${s.accent}">${s.sub}</p>
-    <h2>${s.title}</h2>
-    <p class="panel-desc">${s.body}</p>
-    ${
-      s.tags.length
-        ? `<ul class="panel-tech">${s.tags.map((t) => `<li>${t}</li>`).join('')}</ul>`
-        : ''
-    }
-    <div class="panel-links">
-      <a href="${s.url}">${s.cta} &rsaquo;</a>
-    </div>
-    <p class="panel-enter"><kbd>E</kbd> to open it</p>`;
+  /** The last frame's rAF timestamp, milliseconds. Negative until there has been one. */
+  let last = -1;
+  renderer.setAnimationLoop((time: number) => {
+    // performance.now() only brackets the callback. The step is the display's own timestamp,
+    // unsmoothed: any filter on it would make physics time drift from what is on screen.
+    const begin = performance.now();
+    try {
+      const dt = last < 0 ? 0 : Math.min((time - last) / 1000, 0.05);
+      last = time;
+      state.time += dt;
+      // Half a millisecond of slack keeps a 100 Hz frame that ran a hair long at one step.
+      const n = Math.max(1, Math.ceil((dt * 1000 - 0.5) / 10));
+      const h = dt / n;
+      renderer.info.reset();
+      beginFrame();
 
-  const cvPanel = () => `
-    <p class="panel-kicker">Finish line</p>
-    <h2>Brandon van Vuuren &mdash; CV</h2>
-    <p class="panel-desc">The whole thing in PDF form: experience, education, stack.</p>
-    <div class="panel-links">
-      <a href="${CV_PDF}" target="_blank" rel="noopener">Open the PDF &rsaquo;</a>
-      <a href="${CV_PDF}" download>Download &rsaquo;</a>
-    </div>
-    <p class="panel-enter"><kbd>E</kbd> to open it</p>`;
-
-  /** Is the car standing on this yawed pad? */
-  const onPad = (
-    px: number,
-    pz: number,
-    at: { position: THREE.Vector3; yaw: number; half: { x: number; z: number } }
-  ) => {
-    const dx = px - at.position.x;
-    const dz = pz - at.position.z;
-    const c = Math.cos(at.yaw);
-    const sn = Math.sin(at.yaw);
-    return Math.abs(dx * c - dz * sn) < at.half.x && Math.abs(dx * sn + dz * c) < at.half.z;
-  };
-
-  /* ---------------------------------------------------------------- loop */
-  const camTarget = new THREE.Vector3();
-  const camLook = new THREE.Vector3();
-  const lookAt = new THREE.Vector3();
-  const yawEuler = new THREE.Euler(0, 0, 0, 'YXZ');
-  const yawQuat = new THREE.Quaternion();
-  const offset = new THREE.Vector3();
-  const camDir = new THREE.Vector3();
-  const camFrom = new THREE.Vector3();
-  const caster = new THREE.Raycaster();
-  const wheelHit = new THREE.Vector3();
-
-  // Manual clock: THREE.Clock is deprecated in r186.
-  let last = performance.now();
-  let elapsed = 0;
-  const tick = () => {
-    const now = performance.now();
-    const dt = (now - last) / 1000;
-    last = now;
-    elapsed += dt;
-    return Math.min(dt, 1 / 20);
-  };
-  const resetClock = () => {
-    last = performance.now();
-  };
-
-  let running = false;
-  let flippedFor = 0;
-  // Marks are laid densely so a slide draws a continuous line; dust is emitted
-  // at a fifth of that rate, or the puffs pile into a cloud that hides them.
-  let skidTimer = 0;
-  let dustTimer = 0;
-  let groundY = 0;
-  let fov = 58;
-  let shownKnocked = -1;
-
-  function resize() {
-    const w = canvas.clientWidth || innerWidth;
-    const h = canvas.clientHeight || innerHeight;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-  }
-  addEventListener('resize', resize);
-  resize();
-
-  function frame() {
-    const dt = tick();
-
-    if (running) {
-      car.applyInput(input, dt);
-      world.step(1 / 60, dt, 3);
-      car.sync();
-
-      if (input.consumeReset()) car.reset();
-      if (input.consumeHorn()) honk();
-
-      // Auto-righting: if you land on the roof you get put back after a beat
-      flippedFor = car.isFlipped ? flippedFor + dt : 0;
-      if (flippedFor > 1.6) {
-        car.reset(car.body.position.clone());
-        car.body.position.y += 1.6;
-        flippedFor = 0;
+      if (resized) {
+        resized = false;
+        render.resize();
       }
 
-      const pos = car.object.position;
-      const rush = Math.min(car.speedKmh / 80, 1);
+      input.sample();
 
-      // Chase camera — follows heading only, so bumps don't roll the view,
-      // and pulls back as you gather speed.
-      yawEuler.setFromQuaternion(car.object.quaternion);
-      yawQuat.setFromEuler(new THREE.Euler(0, yawEuler.y, 0));
-
-      /* ----------------------------------------------------------- effects */
-
-      const yaw = yawEuler.y;
-      const slip = car.slip;
-
-      // Last known ground height, so the shadow lands on the tunnel roof
-      // rather than through it, and airtime is measured from what you left.
-      const under = car.groundY;
-      if (!Number.isNaN(under)) groundY = under;
-      fx.shadow(pos.x, groundY, pos.z, yaw, Math.max(0, pos.y - groundY - 0.6));
-
-      dustTimer -= dt;
-      const puffing = slip > 0.4 && dustTimer <= 0;
-      if (puffing) dustTimer = 0.085;
-
-      skidTimer -= dt;
-      if (slip > 0.22 && car.speedKmh > 10 && skidTimer <= 0) {
-        skidTimer = 0.022;
-        // Rear wheels only. The fronts mark too in reality, but four
-        // overlapping trails read as a smear rather than a pair of lines.
-        for (const i of [2, 3]) {
-          if (!car.wheelDown(i)) continue;
-          car.contactPoint(i, wheelHit);
-          fx.skid(wheelHit.x, wheelHit.z, yaw, 0.42 + slip * 0.3);
-          if (puffing) fx.dust(wheelHit.x, wheelHit.y + 0.2, wheelHit.z, slip);
-        }
-      }
-      offset
-        .set(0, 4.3 + rush * 1.1, -(9.5 + rush * 4))
-        .applyQuaternion(yawQuat)
-        .add(pos);
-
-      // Camera collision: without it, backing into a billboard puts the view
-      // inside its frame and the screen fills with the back of a board.
-      camFrom.copy(pos).setY(pos.y + 1.2);
-      camDir.copy(offset).sub(camFrom);
-      const reach = camDir.length();
-      camDir.divideScalar(reach);
-      caster.set(camFrom, camDir);
-      caster.far = reach;
-      const blocked = caster.intersectObjects(bits.blockers, false)[0];
-      if (blocked) {
-        offset.copy(camFrom).addScaledVector(camDir, Math.max(3, blocked.distance - 0.8));
-      }
-
-      const k = 1 - Math.pow(0.0015, dt);
-      camTarget.lerp(offset, k);
-      camera.position.copy(camTarget);
-
-      camLook.lerp(lookAt.copy(pos).setY(pos.y + 1.2), k * 1.4);
-      camera.lookAt(camLook);
-
-      const wantFov = 58 + rush * 7;
-      if (Math.abs(wantFov - fov) > 0.08) {
-        fov = wantFov;
-        camera.fov = fov;
-        camera.updateProjectionMatrix();
-      }
-
-      // Keep the shadow frustum on the car
-      bits.sun.position.set(pos.x + 40, 60, pos.z + 30);
-      bits.sun.target.position.copy(pos);
-      bits.sun.target.updateMatrixWorld();
-
-      // Whichever pad the car is standing on wins, finish line first. The same
-      // branch sets what E will open, so the key can never disagree with the
-      // panel on screen.
-      if (Math.hypot(pos.x - bits.cv.position.x, pos.z - bits.cv.position.z) < bits.cv.radius) {
-        setPanel('cv', cvPanel());
-        activeUrl = CV_PDF;
-      } else {
-        const spot = bits.spots.find((sp) => onPad(pos.x, pos.z, sp));
-        if (spot) {
-          setPanel(`spot:${spot.id}`, spotPanel(spot));
-          activeUrl = spot.url;
-        } else {
-          const board = bits.boards.find((bd) => onPad(pos.x, pos.z, bd));
-          setPanel(board ? `board:${board.site.slug}` : '', board ? boardPanel(board) : '');
-          activeUrl = board ? siteLinks[board.site.slug] ?? null : null;
+      if (dt > 0) {
+        for (let i = 0; i < n; i++) {
+          for (let m = 0; m < modules.length; m++) modules[m].substep?.(h);
+          step(h);
         }
       }
 
-      speedEl.textContent = String(Math.round(car.speedKmh));
+      for (let m = 0; m < modules.length; m++) modules[m].update?.(dt);
 
-      const { knocked, total } = bits.score();
-      if (knocked !== shownKnocked) {
-        shownKnocked = knocked;
-        scoreEl.textContent = `${knocked}/${total}`;
-      }
+      renderer.render(scene, camera);
 
-      if (soundOn && audio && engineGain && engineOsc) {
-        engineOsc.frequency.setTargetAtTime(58 + rush * 170, audio.currentTime, 0.08);
-        engineGain.gain.setTargetAtTime(0.018 + rush * 0.04, audio.currentTime, 0.1);
-      }
+      const cpuMs = performance.now() - begin;
+      instrument?.record(time, dt, n, cpuMs);
+      render.govern(dt, cpuMs, state);
+      if (state.phase === 'loading' && render.refreshMs > 0) ready();
+    } catch (error) {
+      renderer.setAnimationLoop(null);
+      fail(error);
     }
-
-    // The car position drives the distance fades: leave it out and everything
-    // registered with one stays invisible.
-    bits.update(elapsed, car.object.position);
-    fx.update(dt);
-    renderer.render(scene, camera);
-  }
-
-  renderer.setAnimationLoop(frame);
-
-  /* --------------------------------------------------------------- start */
-  startBtn.addEventListener('click', () => {
-    intro.hidden = true;
-    hud.hidden = false;
-    stick.hidden = false;
-    running = true;
-    resetClock(); // drop the idle time so the first frame isn't a huge step
-    camTarget.copy(camera.position);
-    bits.start();
-    bits.playVideo(); // browsers only allow this off a user gesture
-    canvas.focus();
-  });
-
-  // Resuming a hidden tab with a giant dt launches the car into orbit.
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) resetClock();
-  });
-
-  addEventListener('pagehide', () => {
-    renderer.setAnimationLoop(null);
-    input.dispose();
-    renderer.dispose();
   });
 }
 
-boot().catch((err) => {
-  console.error(err);
-  loading.hidden = true;
-  intro.hidden = true;
-  fallback.hidden = false;
-});
+boot().catch(fail);

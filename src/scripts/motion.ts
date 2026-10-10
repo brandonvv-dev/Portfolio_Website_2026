@@ -1,162 +1,156 @@
 /**
- * Motion runtime. Deliberately tiny: continuous scroll effects live in CSS
- * (scroll-driven animations), so JS only handles what CSS cannot —
- * enter-once reveals and pointer tilt.
+ * The one runner. Loaded by Layout.astro for every page except the bare game page.
+ * It waits for the three preloaded faces (never longer than 1.2s), runs the generic handlers,
+ * runs every sections/<id>.ts init, and adds .fx to <html> last. Until .fx the hidden states in
+ * site.css hold; the inline from-states written here replace them.
  */
+import { MQ, ScrollTrigger, developPlate, drawRule, gsap, splitRise } from './kit';
+import type { MotionCtx, SectionInit } from './kit';
 
-const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const sections = import.meta.glob<{ default: SectionInit }>('./sections/*.ts', { eager: true });
 
-/**
- * Reveal anything carrying a reveal class once it reaches the fold.
- *
- * Deliberately a scroll sweep rather than an IntersectionObserver: IO only
- * fires when a threshold is *crossed*, so an anchor jump or a fast flick that
- * skips an element in a single frame leaves it hidden forever. Comparing
- * positions can't skip. The list shrinks as elements land, and unhooks itself.
- */
-function observeReveals() {
-  let targets = [
-    ...document.querySelectorAll<HTMLElement>('.reveal, .reveal-blur, .reveal-zoom'),
-  ];
-  if (reduced) {
-    targets.forEach((el) => el.classList.add('is-in'));
-    return;
-  }
+const FONTS = ['300 1em "Newsreader Display"', '400 1em Newsreader', '400 1em "IBM Plex Mono"'];
+const FONT_WAIT_MS = 1200;
 
-  let frame = 0;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
-  const sweep = () => {
-    frame = 0;
-    const fold = innerHeight * 0.92;
-    targets = targets.filter((el) => {
-      if (el.getBoundingClientRect().top > fold) return true;
-      el.classList.add('is-in');
-      return false;
-    });
-    if (!targets.length) {
-      removeEventListener('scroll', onScroll);
-      removeEventListener('resize', onScroll);
-    }
-  };
-
-  const onScroll = () => {
-    if (!frame) frame = requestAnimationFrame(sweep);
-  };
-
-  addEventListener('scroll', onScroll, { passive: true });
-  addEventListener('resize', onScroll, { passive: true });
-  sweep();
+function fontsReady(): Promise<unknown> {
+  return Promise.race([
+    Promise.allSettled(FONTS.map((font) => document.fonts.load(font))),
+    new Promise<void>((resolve) => setTimeout(resolve, FONT_WAIT_MS)),
+  ]);
 }
 
-/** Pointer tilt. Writes CSS vars; the transform itself is CSS. */
-function bindTilt() {
-  if (reduced || matchMedia('(hover: none)').matches) return;
+/** Selectors below skip [data-load]: those belong to their section's own timeline. */
+const pick = <T extends Element>(selector: string): T[] =>
+  gsap.utils.toArray<T>(`${selector}:not([data-load])`);
 
-  document.querySelectorAll<HTMLElement>('.tilt').forEach((el) => {
-    const max = Number(el.dataset.tilt ?? 7);
-    let frame = 0;
-
-    el.addEventListener('pointermove', (e) => {
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        const r = el.getBoundingClientRect();
-        const x = (e.clientX - r.left) / r.width - 0.5;
-        const y = (e.clientY - r.top) / r.height - 0.5;
-        el.classList.add('is-tilting');
-        el.style.setProperty('--ry', `${x * max * 2}deg`);
-        el.style.setProperty('--rx', `${-y * max * 2}deg`);
+function bindGeneric(mm: gsap.MatchMedia): void {
+  mm.add(MQ.ok, () => {
+    const lines = gsap.utils.toArray<HTMLElement>('.page-grid i');
+    if (lines.length) {
+      gsap.from(lines, {
+        scaleY: 0,
+        transformOrigin: 'center top',
+        duration: 1.2,
+        ease: 'power3.inOut',
+        stagger: 0.07,
       });
-    });
+    }
 
-    el.addEventListener('pointerleave', () => {
-      el.classList.remove('is-tilting');
-      el.style.setProperty('--rx', '0deg');
-      el.style.setProperty('--ry', '0deg');
-    });
+    pick('[data-split]').forEach((el) => splitRise(el));
+
+    pick<HTMLElement>('[data-rule]').forEach((el) =>
+      drawRule(el, { axis: el.dataset.rule === 'y' ? 'y' : 'x' }),
+    );
+
+    const rises = pick('[data-rise]');
+    if (rises.length) {
+      gsap.set(rises, { y: 16, opacity: 0 });
+      ScrollTrigger.batch(rises, {
+        interval: 0.1,
+        batchMax: 4,
+        start: 'top 90%',
+        once: true,
+        onEnter: (batch) =>
+          gsap.to(batch, {
+            y: 0,
+            opacity: 1,
+            duration: 0.8,
+            ease: 'power3.out',
+            stagger: 0.06,
+            overwrite: true,
+            clearProps: 'transform,opacity',
+          }),
+      });
+    }
+
+    const plates = pick('[data-plate]');
+    if (plates.length) {
+      gsap.set(plates, { clipPath: 'inset(100% 0% 0% 0%)' });
+      plates.forEach((frame) => {
+        const img = frame.querySelector('img');
+        if (img) gsap.set(img, { scale: 1.18 });
+      });
+      ScrollTrigger.batch(plates, {
+        batchMax: 3,
+        start: 'top 88%',
+        once: true,
+        onEnter: (batch) =>
+          batch.forEach((frame, i) => developPlate(frame, { start: null, delay: i * 0.12 })),
+      });
+    }
+  });
+
+  // Phones play the same sequence at 0.8x the duration
+  mm.add(`${MQ.ok} and (max-width: 899px)`, () => {
+    gsap.globalTimeline.timeScale(1.25);
+    return () => {
+      gsap.globalTimeline.timeScale(1);
+    };
   });
 }
 
-/**
- * Nav: solidify once the hero is behind us. Apple keeps the bar transparent
- * over the hero, then fades in the blurred backdrop.
- */
-function bindNav() {
-  const nav = document.querySelector<HTMLElement>('[data-nav]');
-  if (!nav) return;
-  const sentinel = document.querySelector('[data-nav-sentinel]');
-  if (!sentinel) return;
-  new IntersectionObserver(
-    ([entry]) => nav.classList.toggle('is-solid', !entry.isIntersecting),
-    { threshold: 0 }
-  ).observe(sentinel);
-}
+/** In-page anchors: smooth (instant under reduced motion), hash updated, focus moved to the target. */
+function bindAnchors(): void {
+  document.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = event.target instanceof Element ? event.target.closest('a[href^="#"]') : null;
+    const href = link?.getAttribute('href') ?? '';
+    // #site-<slug> belongs to the lightbox
+    if (href.length < 2 || href.startsWith('#site-')) return;
+    const target = document.getElementById(decodeURIComponent(href.slice(1)));
+    if (!target) return;
 
-/** Mobile nav sheet. */
-function bindNavToggle() {
-  const toggle = document.querySelector<HTMLButtonElement>('[data-nav-toggle]');
-  const sheet = document.querySelector<HTMLElement>('[data-nav-sheet]');
-  if (!toggle || !sheet) return;
-
-  const setOpen = (open: boolean) => {
-    toggle.setAttribute('aria-expanded', String(open));
-    sheet.toggleAttribute('data-open', open);
-    document.body.style.overflow = open ? 'hidden' : '';
-  };
-
-  toggle.addEventListener('click', () =>
-    setOpen(toggle.getAttribute('aria-expanded') !== 'true')
-  );
-  sheet.addEventListener('click', (e) => {
-    if ((e.target as HTMLElement).closest('a')) setOpen(false);
+    event.preventDefault();
+    target.scrollIntoView({ behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+    history.replaceState(null, '', href);
+    if (!target.matches('a, button, input, select, textarea, [tabindex]')) {
+      target.setAttribute('tabindex', '-1');
+    }
+    target.focus({ preventScroll: true });
   });
-  addEventListener('keydown', (e) => e.key === 'Escape' && setOpen(false));
 }
 
-/**
- * Fallback parallax for browsers without CSS scroll timelines (Firefox today).
- * Cheap: one rAF-throttled scroll handler, transform only.
- */
-function parallaxFallback() {
-  if (reduced || CSS.supports('animation-timeline', 'view()')) return;
-
-  const items = [...document.querySelectorAll<HTMLElement>('.scroll-parallax')];
-  if (!items.length) return;
-
-  let frame = 0;
-  const tick = () => {
-    frame = 0;
-    const h = innerHeight;
-    items.forEach((el) => {
-      const r = el.getBoundingClientRect();
-      if (r.bottom < -200 || r.top > h + 200) return;
-      // -1 above the fold .. +1 below it
-      const progress = (r.top + r.height / 2) / h - 0.5;
-      const depth = parseFloat(el.style.getPropertyValue('--depth')) || 60;
-      el.style.transform = `translate3d(0, ${progress * depth * 2}px, 0)`;
-    });
-  };
-
-  addEventListener(
-    'scroll',
-    () => {
-      if (!frame) frame = requestAnimationFrame(tick);
-    },
-    { passive: true }
-  );
-  tick();
+/** Triggers measure the page, so they are measured again when it changes height or the faces land. */
+function bindRefresh(): void {
+  const main = document.querySelector('main');
+  if (main) {
+    let timer = 0;
+    new ResizeObserver(() => {
+      clearTimeout(timer);
+      timer = window.setTimeout(() => ScrollTrigger.refresh(), 150);
+    }).observe(main);
+  }
+  void document.fonts.ready.then(() => ScrollTrigger.refresh());
 }
 
-function init() {
-  observeReveals();
-  bindTilt();
-  bindNav();
-  bindNavToggle();
-  parallaxFallback();
+async function boot(): Promise<void> {
+  await fontsReady();
+
+  const ctx: MotionCtx = { mm: gsap.matchMedia() };
+  bindGeneric(ctx.mm);
+  for (const [path, section] of Object.entries(sections)) {
+    try {
+      section.default(ctx);
+    } catch (error) {
+      console.error(path, error);
+    }
+  }
+  bindAnchors();
+  // A ScrollTrigger refresh after a matchMedia change (resize past 900 px, a reduced-motion
+  // flip) scrolls the page to the top; put the reader back where they were.
+  let savedScroll = 0;
+  ScrollTrigger.addEventListener('refreshInit', () => {
+    savedScroll = window.scrollY;
+  });
+  ScrollTrigger.addEventListener('refresh', () => {
+    if (savedScroll > 0 && Math.abs(window.scrollY - savedScroll) > 2) window.scrollTo(0, savedScroll);
+  });
+  bindRefresh();
+
+  document.documentElement.classList.add('fx');
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init, { once: true });
-} else {
-  init();
-}
+void boot();

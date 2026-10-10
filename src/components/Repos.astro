@@ -1,62 +1,52 @@
 ---
-import { getRecentRepos, formatDate } from '../utils/github';
+import Arrow from './Arrow.astro';
+import Folio from './Folio.astro';
+import { profileUrl, timeAgo } from '../utils/github';
+import type { GitHubRepo } from '../utils/github';
 
-const repos = (await getRecentRepos(9)).filter((r) => !r.private);
+interface Props {
+  repos: GitHubRepo[];
+}
 
-const langColor: Record<string, string> = {
-  TypeScript: '#3178c6',
-  JavaScript: '#f1e05a',
-  Python: '#3572A5',
-  'C#': '#8b2be2',
-  Astro: '#ff5d01',
-  HTML: '#e34c26',
-  CSS: '#563d7c',
-  Shell: '#89e051',
-};
+const { repos } = Astro.props;
+
+const snapshot = new Intl.DateTimeFormat('en-ZA', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+}).format(new Date());
 ---
 
 {
   repos.length > 0 && (
-    <section id="open-source" class="repos">
-      <div class="shell">
-        <header class="repos-head">
-          <div>
-            <p class="t-eyebrow reveal">Open source</p>
-            <h2 class="t-headline t-shine reveal" style="--d:80ms">
-              Live from GitHub.
-            </h2>
-          </div>
-          <a
-            class="link-arrow reveal"
-            style="--d:160ms"
-            href="https://github.com/brandonvv-dev"
-            target="_blank"
-            rel="noopener"
-          >
-            All repositories
-          </a>
-        </header>
-
-        <ul class="repo-grid">
-          {repos.map((r, i) => (
-            <li class="reveal" style={`--d:${i * 60}ms`}>
-              <a class="repo card" href={r.html_url} target="_blank" rel="noopener">
-                <h3>{r.name}</h3>
-                <p>{r.description ?? 'No description yet.'}</p>
-                <footer>
-                  {r.language && (
-                    <span class="repo-lang">
-                      <i style={`background:${langColor[r.language] ?? '#8e8e93'}`} />
-                      {r.language}
-                    </span>
-                  )}
-                  <span>★ {r.stargazers_count}</span>
-                  <span class="repo-date">Updated {formatDate(r.updated_at)}</span>
-                </footer>
+    <section id="open-source" class="sec" data-folio="Source">
+      <Folio name="Source" datum={`Snapshot at build, ${snapshot}`} />
+      <h2 class="sr-only">Open source repositories</h2>
+      <div class="wrap">
+        <ol class="repos">
+          {repos.map((r) => (
+            <li data-rise>
+              <a class="repo-row" href={r.html_url} target="_blank" rel="noopener">
+                <span class="repo-name">
+                  {r.name}
+                  <span class="repo-go">
+                    <Arrow dir="up-right" />
+                  </span>
+                </span>
+                {r.description && <span class="repo-desc t-body">{r.description}</span>}
+                <span class="repo-meta mono-data">
+                  {r.language && <span>{r.language}</span>}
+                  <span class="repo-date">Updated {timeAgo(r.updated_at)}</span>
+                </span>
               </a>
             </li>
           ))}
-        </ul>
+        </ol>
+        <p class="repos-all">
+          <a class="link t-body" href={profileUrl} target="_blank" rel="noopener">
+            All repositories<Arrow dir="up-right" />
+          </a>
+        </p>
       </div>
     </section>
   )
@@ -64,86 +54,95 @@ const langColor: Record<string, string> = {
 
 <style>
   .repos {
-    padding-block: clamp(5rem, 12vw, 9rem);
-    border-top: 1px solid var(--hairline);
-  }
-
-  .repos-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: end;
-    justify-content: space-between;
-    gap: 1.5rem;
-    margin-bottom: clamp(2.5rem, 6vw, 4rem);
-  }
-  .repos-head h2 {
-    margin: 0.5rem 0 0;
-  }
-
-  .repo-grid {
-    list-style: none;
+    grid-column: 1 / -1;
     margin: 0;
     padding: 0;
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+    list-style: none;
+  }
+  .repos > li {
+    border-top: 1px solid var(--rule);
+  }
+  .repos > li:last-child {
+    border-bottom: 1px solid var(--rule);
   }
 
-  .repo {
-    display: grid;
-    gap: 0.6rem;
-    align-content: start;
-    height: 100%;
-    padding: 1.4rem;
-    text-decoration: none;
-    color: inherit;
-    background: linear-gradient(180deg, #131315, #0b0b0d);
-    transition: transform 0.35s var(--ease-out), border-color 0.3s var(--ease),
-      background 0.3s var(--ease);
+  /* The row reaches 12px past the grid on each side so its hover fill has room around the text */
+  .repo-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    min-height: 56px;
+    margin-inline: -12px;
+    padding: 1.25rem 12px;
+    transition: background-color 0.3s;
   }
-  .repo:hover {
-    transform: translateY(-4px);
-    border-color: var(--hairline-strong);
-    background: linear-gradient(180deg, #18181b, #0d0d10);
+  .repo-row:is(:hover, :focus-visible) {
+    background: var(--ink-2);
   }
 
-  .repo h3 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    letter-spacing: -0.015em;
-    color: var(--accent);
-    word-break: break-word;
+  .repo-name {
+    font-family: var(--serif);
+    font-size: 1.375rem;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+    transition: transform 0.3s;
   }
-  .repo p {
-    margin: 0;
-    font-size: 0.875rem;
-    line-height: 1.5;
-    color: var(--text-muted);
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+  .repo-row:is(:hover, :focus-visible) .repo-name {
+    transform: translateX(8px);
   }
-  .repo footer {
+  .repo-go {
+    margin-left: 0.5em;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .repo-row:is(:hover, :focus-visible) .repo-go {
+    opacity: 1;
+  }
+
+  .repo-desc {
+    color: var(--paper-2);
+  }
+
+  .repo-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.9rem;
-    margin-top: 0.4rem;
-    font-size: 0.75rem;
-    color: var(--text-dim);
-  }
-  .repo-lang {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-  .repo-lang i {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
+    column-gap: 1rem;
+    row-gap: 0.25rem;
   }
   .repo-date {
     margin-left: auto;
+    text-align: right;
   }
+
+  .repos-all {
+    grid-column: 1 / -1;
+    margin: clamp(2rem, 4vw, 3rem) 0 0;
+  }
+
+  @media (min-width: 900px) {
+    .repo-row {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      column-gap: var(--gap);
+      align-items: baseline;
+      padding-block: 1.5rem;
+    }
+    .repo-name {
+      grid-column: 1 / 5;
+    }
+    .repo-desc {
+      grid-column: 5 / 10;
+    }
+    .repo-meta {
+      grid-column: 10 / -1;
+    }
+  }
+
+  @media (hover: none) {
+    .repo-go {
+      opacity: 1;
+    }
+  }
+
 </style>

@@ -1,231 +1,461 @@
 ---
+import Arrow from './Arrow.astro';
+import Folio from './Folio.astro';
 import { projects } from '../data/projects';
+import type { Project } from '../data/projects';
+import { counts } from '../utils/site';
 
-const featured = projects.filter((p) => p.featured);
+const featured = projects.filter((project) => project.featured);
+
+const pad = (n: number): string => String(n).padStart(2, '0');
+const shotsOf = (project: Project): string[] =>
+  project.images?.length ? project.images : project.image ? [project.image] : [];
+// 'Apache Kafka, React +5': the first two technologies and how many more the panel lists
+const stackOf = (tech: string[]): string =>
+  tech.length > 2 ? `${tech[0]}, ${tech[1]} +${tech.length - 2}` : tech.join(', ');
+
+const peekSrc = encodeURI(shotsOf(featured[0])[0] ?? '');
 ---
 
-<section id="work" class="work">
-  <header class="work-head shell">
-    <p class="t-eyebrow reveal">Selected work</p>
-    <h2 class="t-headline t-shine reveal" style="--d:80ms">
-      Things I built that<br />other people actually use.
+<section id="work" class="sec work" data-folio="Work" aria-labelledby="work-title">
+  <div class="wrap work-head">
+    <Folio name="Work" datum={`${counts.projects} projects`} />
+    <h2 class="t-title work-title" id="work-title">
+      <span data-split>Work</span><span class="sup" aria-hidden="true" data-rise
+        >{counts.projects}</span
+      >
     </h2>
-    <p class="t-body work-lede reveal" style="--d:160ms">
-      Streaming pipelines, assessment platforms, document AI, booking systems.
-      Scroll &mdash; each one stacks on the last.
+    <p class="t-body work-deck" data-split>
+      Streaming pipelines, an assessment platform, document AI, booking systems and a fine-tuning
+      pipeline. Each project carries its screenshots.
     </p>
-  </header>
+  </div>
 
-  <div class="stack shell">
+  <ol class="work-index">
     {
-      featured.map((p, i) => (
-        <article class="stack-item" style={`--i:${i}`}>
-          <div class="card proj reveal">
-            <div class="proj-copy">
-              <span class="proj-index">{String(i + 1).padStart(2, '0')}</span>
-              <h3 class="t-title">{p.title}</h3>
-              <p class="t-body proj-desc">{p.longDescription}</p>
+      featured.map((project, i) => {
+        const shots = shotsOf(project);
+        const open = i === 0;
+        return (
+          <li class="work-row" data-rise>
+            <h3>
+              <button
+                type="button"
+                class="row-head"
+                aria-expanded={open ? 'true' : 'false'}
+                aria-controls={`work-panel-${i}`}
+                aria-labelledby={`work-name-${i}`}
+                aria-describedby={`work-desc-${i}`}
+                data-peek={shots[0] ? encodeURI(shots[0]) : undefined}
+              >
+                <span class="row-no mono" aria-hidden="true">
+                  {pad(i + 1)}
+                </span>
+                <span class="row-name t-h3" id={`work-name-${i}`}>
+                  {project.title}
+                </span>
+                <span class="row-desc t-body" id={`work-desc-${i}`}>
+                  {project.description}
+                </span>
+                <span class="row-end">
+                  <span class="row-stack mono-data" aria-hidden="true">
+                    {stackOf(project.tech)}
+                  </span>
+                  <span class="mark" aria-hidden="true" />
+                </span>
+              </button>
+            </h3>
 
-              <ul class="proj-tech">
-                {p.tech.slice(0, 7).map((t) => (
-                  <li>{t}</li>
-                ))}
-              </ul>
+            <div
+              class="row-panel"
+              id={`work-panel-${i}`}
+              role="region"
+              aria-labelledby={`work-name-${i}`}
+            >
+              <div class="panel-body">
+                <div class="panel-copy">
+                  <p class="t-body">{project.longDescription}</p>
+                  <p class="mono-data">{project.tech.join(', ')}</p>
+                  {(project.github || project.live || project.video) && (
+                    <p class="panel-links">
+                      {project.github && (
+                        <a
+                          class="link"
+                          href={project.github}
+                          target="_blank"
+                          rel="noopener"
+                          aria-label={`${project.title} source`}
+                        >
+                          Source
+                          <Arrow dir="up-right" />
+                        </a>
+                      )}
+                      {project.live && (
+                        <a
+                          class="link"
+                          href={project.live}
+                          target="_blank"
+                          rel="noopener"
+                          aria-label={`${project.title} live site`}
+                        >
+                          Live
+                          <Arrow dir="up-right" />
+                        </a>
+                      )}
+                      {project.video && (
+                        <a
+                          class="link"
+                          href={encodeURI(project.video)}
+                          target="_blank"
+                          rel="noopener"
+                          aria-label={`${project.title} demo video`}
+                        >
+                          Demo
+                          <Arrow dir="up-right" />
+                        </a>
+                      )}
+                    </p>
+                  )}
+                </div>
 
-              <div class="proj-links">
-                {p.github && (
-                  <a class="link-arrow" href={p.github} target="_blank" rel="noopener">
-                    Source
-                  </a>
-                )}
-                {p.live && (
-                  <a class="link-arrow" href={p.live} target="_blank" rel="noopener">
-                    Live site
-                  </a>
-                )}
-                {p.video && (
-                  <a class="link-arrow" href={p.video} target="_blank" rel="noopener">
-                    Watch demo
-                  </a>
+                {shots.length > 0 && (
+                  <div class="panel-shots">
+                    <ul class="rail" tabindex="0" aria-label={`${project.title} screenshots`}>
+                      {shots.map((src, n) => (
+                        <li class="plate">
+                          <img
+                            src={encodeURI(src)}
+                            width="640"
+                            height="400"
+                            loading="lazy"
+                            decoding="async"
+                            alt={`${project.title}, screen ${n + 1}`}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                    <p class="mono shots-caption">Fig. 1 of {shots.length}</p>
+                  </div>
                 )}
               </div>
             </div>
-
-            <div class="proj-shots">
-              {/* Native scroll-snap rail — swipeable, no JS carousel. */}
-              <div class="rail proj-rail">
-                {(p.images?.length ? p.images : [p.image!]).slice(0, 8).map((src, n) => (
-                  <figure class="shot tilt" data-tilt="4">
-                    <div class="shot-bar" aria-hidden="true">
-                      <i /><i /><i />
-                    </div>
-                    <img
-                      src={src}
-                      alt={`${p.title} screenshot ${n + 1}`}
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </figure>
-                ))}
-              </div>
-              <p class="proj-hint" aria-hidden="true">Swipe &rarr;</p>
-            </div>
-          </div>
-        </article>
-      ))
+          </li>
+        );
+      })
     }
+  </ol>
+
+  <div class="peek plate" aria-hidden="true">
+    <img src={peekSrc} width="300" height="188" loading="lazy" decoding="async" alt="" />
   </div>
 </section>
 
 <style>
   .work {
-    padding-block: clamp(5rem, 12vw, 9rem) 4rem;
+    --bleed: 16px;
   }
-
-  .work-head {
-    display: grid;
-    gap: 1rem;
-    max-width: 900px;
-    margin-bottom: clamp(3rem, 7vw, 5rem);
-  }
-  .work-head h2 {
-    margin: 0;
-  }
-  .work-lede {
-    max-width: 52ch;
-    margin: 0;
-  }
-
-  /* Each card pins slightly lower than the last, so the stack shows its edges. */
-  .stack {
-    display: grid;
-    gap: clamp(1.5rem, 4vw, 2.5rem);
-    padding-bottom: 30vh;
-  }
-  .stack-item {
-    position: sticky;
-    top: calc(5.5rem + var(--i) * 14px);
-  }
-
-  .proj {
-    display: grid;
-    gap: 0;
-    background: linear-gradient(180deg, #161618, #0c0c0e);
-    box-shadow: 0 -1px 0 0 rgba(255, 255, 255, 0.06) inset,
-      0 40px 80px -40px rgba(0, 0, 0, 1);
-  }
-
-  .proj-copy {
-    padding: clamp(1.75rem, 4vw, 2.75rem);
-    display: grid;
-    gap: 1rem;
-    align-content: start;
-  }
-
-  .proj-index {
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    color: var(--text-dim);
-  }
-  .proj-copy h3 {
-    margin: 0;
-    color: var(--text);
-    text-wrap: balance;
-  }
-  .proj-desc {
-    margin: 0;
-    max-width: 58ch;
-    font-size: 0.9375rem;
-    line-height: 1.6;
-  }
-
-  .proj-tech {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    list-style: none;
-    margin: 0.25rem 0 0;
-    padding: 0;
-  }
-  .proj-tech li {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    padding: 0.3rem 0.65rem;
-    border: 1px solid var(--hairline);
-    border-radius: 980px;
-    background: rgba(255, 255, 255, 0.03);
-  }
-
-  .proj-links {
-    display: flex;
-    gap: 1.5rem;
-    margin-top: 0.5rem;
-    font-size: 0.9375rem;
-  }
-
-  .proj-shots {
-    position: relative;
-    padding-bottom: 1.75rem;
-    min-width: 0;
-  }
-  .proj-rail {
-    --gutter: clamp(1.75rem, 4vw, 2.75rem);
-    padding-block: 0 1rem;
-  }
-
-  .shot {
-    margin: 0;
-    width: min(78vw, 480px);
-    border-radius: 12px;
-    overflow: hidden;
-    border: 1px solid var(--hairline);
-    background: #0a0a0c;
-    box-shadow: 0 24px 50px -30px rgba(0, 0, 0, 1);
-  }
-  .shot-bar {
-    display: flex;
-    gap: 5px;
-    padding: 8px 10px;
-    background: #17171a;
-    border-bottom: 1px solid var(--hairline);
-  }
-  .shot-bar i {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #3a3a3e;
-  }
-  .shot img {
-    display: block;
-    width: 100%;
-    aspect-ratio: 16 / 10;
-    object-fit: cover;
-    object-position: top center;
-  }
-
-  .proj-hint {
-    margin: 0;
-    padding-inline: clamp(1.75rem, 4vw, 2.75rem);
-    font-size: 0.75rem;
-    color: var(--text-dim);
-  }
-
-  @media (min-width: 1000px) {
-    .proj {
-      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-      align-items: center;
+  @media (max-width: 599px) {
+    .work {
+      --bleed: 12px;
     }
-    .proj-shots {
+  }
+
+  /* ---- Header: title on columns 1 to 7, deck on 9 to 12 once there is room ---- */
+  /* The count sits outside the split element: SplitText would otherwise put it on a second line
+     whenever the page is laid out away from the top (reload, Back, resize) */
+  .work-title {
+    display: flex;
+    align-items: flex-start;
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+  .work-deck {
+    grid-column: 1 / -1;
+    max-width: 38ch;
+    margin: 2rem 0 0;
+    color: var(--paper-2);
+  }
+  @media (min-width: 1100px) {
+    .work-title {
+      grid-column: 1 / 8;
+    }
+    .work-deck {
+      grid-column: 9 / -1;
+      align-self: end;
+      margin: 0 0 0.75rem;
+    }
+  }
+
+  /* ---- Index ---- */
+  .work-index {
+    overflow-anchor: none; /* work.ts keeps the clicked head still itself */
+    list-style: none;
+    width: min(100% - 2 * var(--gutter), var(--wrap-max));
+    margin: clamp(3.5rem, 7vw, 6rem) auto 0;
+    padding: 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .work-row {
+    position: relative;
+    isolation: isolate;
+    border-top: 1px solid var(--rule);
+  }
+  .work-row h3 {
+    margin: 0;
+  }
+  /* The open row is one raised surface that bleeds past the columns; its text stays on the grid */
+  .work-row::before {
+    content: '';
+    position: absolute;
+    inset: 0 calc(-1 * var(--bleed));
+    z-index: -1;
+  }
+  .work-row:has(> h3 > .row-head[aria-expanded='true'])::before {
+    background: var(--ink-1);
+  }
+
+  /* ---- Row head: phone first ---- */
+  .row-head {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+    align-items: baseline;
+    width: 100%;
+    min-height: 64px;
+    padding: 1rem 0;
+    text-align: left;
+    color: var(--paper);
+  }
+  .row-head::before {
+    content: '';
+    position: absolute;
+    inset: 0 calc(-1 * var(--bleed));
+    z-index: -1;
+    background: var(--ink-2);
+    opacity: 0;
+  }
+  .row-no {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .row-name {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .row-desc {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: 0.5rem;
+    color: var(--paper-2);
+  }
+  .row-end {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: start;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-start;
+    gap: var(--gap);
+    padding: 0.4rem 0 0 var(--gap);
+  }
+  .row-stack {
+    display: none;
+    text-align: right;
+  }
+
+  /* The mark is a plus drawn from two hairlines; open, it turns into a cross and takes the accent */
+  .mark {
+    position: relative;
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin-top: 1px;
+    color: var(--paper-2);
+  }
+  .mark::before,
+  .mark::after {
+    content: '';
+    position: absolute;
+    background: currentColor;
+  }
+  .mark::before {
+    inset: 50% 0 auto;
+    height: 1px;
+  }
+  .mark::after {
+    inset: 0 auto 0 50%;
+    width: 1px;
+  }
+  .row-head[aria-expanded='true'] .mark {
+    transform: rotate(45deg);
+    color: var(--accent);
+  }
+
+  @media (min-width: 900px) {
+    .row-head {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      column-gap: var(--gap);
+      min-height: 96px;
       padding-block: 1.75rem;
     }
-    .proj-rail {
-      --gutter: 0rem;
-      padding-right: clamp(1.75rem, 4vw, 2.75rem);
+    .row-name {
+      grid-column: 2 / 7;
     }
-    .proj-hint {
+    .row-desc {
+      grid-column: 7 / 12;
+      grid-row: 1;
+      margin-top: 0;
+    }
+    .row-end {
+      grid-column: 12;
+      grid-row: 1;
+      align-self: baseline;
+      padding: 0;
+    }
+  }
+  @media (min-width: 1100px) {
+    .row-desc {
+      grid-column: 7 / 11;
+    }
+    .row-end {
+      grid-column: 11 / -1;
+    }
+    .row-stack {
+      display: block;
+    }
+  }
+
+  @media (hover: hover) {
+    .row-head:hover::before {
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .row-head::before {
+      transition: opacity 0.3s;
+    }
+    .mark {
+      transition:
+        transform 0.4s cubic-bezier(0.215, 0.61, 0.355, 1),
+        color 0.3s;
+    }
+  }
+
+  /* ---- Panel. Only a page that can run script may hide the closed ones; the height and the
+     display are tweened inline by work.ts and handed back to these rules when the tween ends ---- */
+  @media (scripting: enabled) {
+    .work-row:has(> h3 > .row-head[aria-expanded='false']) > .row-panel {
       display: none;
     }
+  }
+  @media (scripting: none) {
+    .mark {
+      display: none;
+    }
+  }
+  .row-panel {
+    margin-inline: calc(-1 * var(--bleed));
+    padding-inline: var(--bleed);
+    background: var(--ink-1);
+  }
+  .panel-body {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--gap);
+    row-gap: 2rem;
+    padding-block: 1.5rem 2rem;
+  }
+  .panel-copy,
+  .panel-shots {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  .panel-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: flex-start;
+  }
+  .panel-copy p {
+    margin: 0;
+  }
+  .panel-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.75rem;
+    font-family: var(--serif);
+    font-size: var(--t-body);
+  }
+  .panel-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  @media (min-width: 900px) {
+    .panel-body {
+      padding-block: 2rem 2.5rem;
+    }
+    .panel-copy,
+    .panel-shots {
+      grid-column: 2 / -1;
+    }
+  }
+  @media (min-width: 1100px) {
+    .panel-copy {
+      grid-column: 2 / 6;
+      padding-right: var(--gap);
+    }
+    .panel-shots {
+      grid-column: 6 / -1;
+    }
+  }
+
+  /* ---- Rail: native scroll-snap, one plate per figure ---- */
+  .rail {
+    display: flex;
+    gap: var(--gap);
+    margin: 0;
+    padding: 0 0 1rem;
+    list-style: none;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+    scrollbar-color: var(--rule-strong) transparent;
+  }
+  .rail .plate {
+    flex: none;
+    width: min(82%, 544px);
+    aspect-ratio: 16 / 10;
+    scroll-snap-align: start;
+  }
+  .rail .plate img {
+    object-position: top center;
+  }
+  .rail:focus-visible .plate img {
+    filter: none;
+  }
+  @media (min-width: 900px) {
+    .rail .plate {
+      width: auto;
+      height: 340px;
+    }
+  }
+  .shots-caption {
+    margin: 0.5rem 0 0;
+  }
+
+  /* ---- Peek: one plate that follows the pointer; work.ts turns it on for a fine pointer only ---- */
+  .peek {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 3;
+    display: none;
+    width: 300px;
+    height: 188px;
+    pointer-events: none;
   }
 </style>

@@ -1,236 +1,286 @@
 ---
-const links = [
-  { href: '#work', label: 'Work' },
-  { href: '#sites', label: '20 Sites' },
-  { href: '#ventures', label: 'Ventures' },
-  { href: '#about', label: 'About' },
-  { href: '#open-source', label: 'Open source' },
-  { href: '#contact', label: 'Contact' },
+import { counts, cv, email } from '../utils/site';
+
+interface Props {
+  /** Source is a section only when GitHub returned repositories. */
+  hasSource: boolean;
+}
+
+const { hasSource } = Astro.props;
+
+// The sheet lists the same sections as the bar, minus Drive, which is pinned below. Its numbers
+// are written by nav.ts from the order of main > section[data-folio], so they match the page.
+const index = [
+  { id: 'work', label: 'Work' },
+  { id: 'sites', label: 'Sites' },
+  { id: 'ventures', label: 'Ventures' },
+  { id: 'about', label: 'About' },
+  ...(hasSource ? [{ id: 'open-source', label: 'Source' }] : []),
+  { id: 'contact', label: 'Contact' },
 ];
 ---
 
-<!-- Watched by motion.ts: once this scrolls out, the bar goes solid. -->
-<div data-nav-sentinel aria-hidden="true" class="absolute top-0 h-[70vh] w-px"></div>
+<header class="nav" data-nav>
+  <i class="nav-rule" data-load></i>
+  <div class="nav-row">
+    <a class="nav-mark" href="#top">Brandon van Vuuren</a>
 
-<header data-nav class="nav">
-  <div class="nav-inner">
-    <a href="#top" class="nav-brand" aria-label="Brandon van Vuuren, home">
-      <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="currentColor">
-        <path d="M4 3h8.2a5.2 5.2 0 0 1 3.4 9.1A5.5 5.5 0 0 1 13.4 21H4V3Zm3.4 3v4.4h4.5a2.2 2.2 0 0 0 0-4.4H7.4Zm0 7.4V18h5.6a2.3 2.3 0 0 0 0-4.6H7.4Z"/>
-      </svg>
-      <span>Brandon van Vuuren</span>
-    </a>
+    <p class="nav-here mono" data-nav-here aria-hidden="true"></p>
 
-    <nav class="nav-links" aria-label="Sections">
-      {links.map((l) => <a href={l.href}>{l.label}</a>)}
+    <nav class="nav-links mono" aria-label="Sections">
+      <a href="#work" data-section="work">Work</a>
+      <a href="#sites" data-section="sites">Sites <span class="sup">{counts.sites}</span></a>
+      <a href="#ventures" data-section="ventures">Ventures</a>
+      <a href="#about" data-section="about">About</a>
+      <a href="/drive" data-section="drive">Drive<span class="nav-sq" aria-hidden="true"></span></a>
+      {hasSource && <a href="#open-source" data-section="open-source">Source</a>}
+      <a href="#contact" data-section="contact">Contact</a>
+      <a href={cv.href} target="_blank" rel="noopener">CV</a>
     </nav>
 
-    <a href="/drive" class="nav-cta">
-      <span class="nav-cta-dot" aria-hidden="true"></span>
-      Drive my CV
-    </a>
-
     <button
-      data-nav-toggle
-      class="nav-burger"
+      class="nav-toggle mono"
       type="button"
+      data-nav-toggle
       aria-expanded="false"
       aria-controls="nav-sheet"
-      aria-label="Menu"
     >
-      <span></span><span></span>
+      Index
     </button>
   </div>
-
-  <div class="nav-progress"><i class="scroll-progress"></i></div>
 </header>
 
-<div id="nav-sheet" data-nav-sheet class="nav-sheet">
-  {links.map((l) => <a href={l.href}>{l.label}<span aria-hidden="true">›</span></a>)}
-  <a href="/drive" class="nav-sheet-cta">Drive my CV<span aria-hidden="true">›</span></a>
+<div id="nav-sheet" class="sheet" data-nav-sheet role="dialog" aria-modal="true" aria-label="Index" hidden>
+  <div class="sheet-top">
+    <p class="mono">Index</p>
+    <button class="nav-toggle mono" type="button" data-nav-close>Close</button>
+  </div>
+
+  <ol class="sheet-list">
+    {
+      index.map((item) => (
+        <li>
+          <a class="sheet-link" href={`#${item.id}`}>
+            <span class="sheet-no mono" data-sheet-no={item.id}></span>
+            <span class="sheet-name"><span class="ln-mask"><span class="ln">{item.label}</span></span></span>
+          </a>
+        </li>
+      ))
+    }
+  </ol>
+
+  <div class="sheet-foot mono">
+    <a href="/drive">Drive<span class="nav-sq" aria-hidden="true"></span></a>
+    <a href={cv.href} target="_blank" rel="noopener">CV</a>
+    <a class="sheet-mail" href={`mailto:${email}`}>{email}</a>
+  </div>
 </div>
 
 <style>
+  /* ---- Bar ---- */
   .nav {
     position: fixed;
     inset: 0 0 auto;
-    z-index: 100;
-    height: 52px;
-    transition: background 0.4s var(--ease), backdrop-filter 0.4s var(--ease),
-      border-color 0.4s var(--ease);
-    border-bottom: 1px solid transparent;
+    z-index: 50;
+    height: 48px;
+    background: var(--ink-0);
   }
-
-  .nav.is-solid {
-    background: rgba(0, 0, 0, 0.72);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    border-bottom-color: var(--hairline);
+  /* The bottom border, drawn from the left at load */
+  .nav-rule {
+    position: absolute;
+    inset: auto 0 0;
+    height: 1px;
+    background: var(--rule);
+    transform-origin: left center;
   }
-
-  .nav-inner {
-    height: 52px;
-    max-width: var(--measure);
-    margin-inline: auto;
-    padding-inline: var(--gutter);
+  .nav-row {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    column-gap: var(--gap);
+    height: 100%;
+    width: min(100% - 2 * var(--gutter), var(--wrap-max));
+    margin-inline: auto;
   }
 
-  .nav-brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--text);
-    text-decoration: none;
-    font-size: 0.875rem;
-    font-weight: 600;
-    letter-spacing: -0.01em;
+  /* Links are shorter than the bar so the 2px ring at 3px offset fits inside it */
+  .nav-mark {
+    flex: none;
     margin-right: auto;
+    padding-block: 6px;
+    font-size: 17px;
+    line-height: 24px;
     white-space: nowrap;
+    color: var(--paper);
+    text-decoration: none;
+  }
+
+  /* The running head: GSAP rolls spans stacked in one grid cell, so the row never changes height */
+  .nav-here {
+    display: none;
+    flex: 1;
+    overflow: clip;
+    white-space: nowrap;
+    color: var(--paper-2);
+  }
+  .nav-here :global(span) {
+    grid-area: 1 / 1;
   }
 
   .nav-links {
     display: none;
-    gap: 1.75rem;
-  }
-
-  .nav-links a {
-    color: var(--text);
-    opacity: 0.82;
-    text-decoration: none;
-    font-size: 0.8125rem;
-    letter-spacing: -0.005em;
-    transition: opacity 0.2s var(--ease);
-  }
-  .nav-links a:hover {
-    opacity: 1;
-  }
-
-  .nav-cta {
-    display: none;
+    flex: none;
     align-items: center;
-    gap: 0.45rem;
-    padding: 0.36rem 0.85rem;
-    border-radius: 980px;
-    background: var(--accent);
-    color: #fff;
-    font-size: 0.8125rem;
-    font-weight: 550;
-    text-decoration: none;
-    transition: background 0.2s var(--ease);
+    column-gap: clamp(16px, 1.9vw, 28px);
   }
-  .nav-cta:hover {
-    background: var(--accent-hi);
+  .nav-links a {
+    display: block;
+    padding-block: 8px;
+    color: var(--paper-2);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color 0.3s;
+  }
+  .nav-links a:is(:hover, :focus-visible),
+  .nav-links a[aria-current] {
+    color: var(--paper);
+  }
+  .nav-links a[aria-current] {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.5em;
+    text-decoration-color: var(--rule-strong);
   }
 
-  .nav-cta-dot {
+  .nav-links .sup {
+    margin-left: 0;
+  }
+
+  /* The state marker: static, the only colour in the bar */
+  .nav-sq {
+    display: inline-block;
     width: 6px;
     height: 6px;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
-    animation: ping 2.4s var(--ease) infinite;
-  }
-  @keyframes ping {
-    70%,
-    100% {
-      box-shadow: 0 0 0 7px rgba(255, 255, 255, 0);
-    }
+    margin-left: 0.7em;
+    background: var(--accent);
+    vertical-align: 0.1em;
   }
 
-  .nav-progress {
-    height: 1px;
-    background: transparent;
-  }
-  .nav-progress i {
-    display: block;
-    height: 1px;
-    background: linear-gradient(90deg, var(--accent), var(--accent-hi));
-    transform: scaleX(0);
-    transform-origin: 0 50%;
-  }
-
-  .nav-burger {
-    display: grid;
-    place-content: center;
-    gap: 5px;
-    width: 40px;
-    height: 40px;
-    margin-right: -8px;
-    background: none;
+  .nav-toggle {
+    flex: none;
+    min-height: 44px;
+    padding: 0 0 0 16px;
     border: 0;
+    background: none;
+    color: var(--paper);
     cursor: pointer;
   }
-  .nav-burger span {
-    display: block;
-    width: 17px;
-    height: 1.5px;
-    background: var(--text);
-    border-radius: 2px;
-    transition: transform 0.3s var(--ease), opacity 0.3s var(--ease);
-  }
-  .nav-burger[aria-expanded='true'] span:first-child {
-    transform: translateY(3.25px) rotate(45deg);
-  }
-  .nav-burger[aria-expanded='true'] span:last-child {
-    transform: translateY(-3.25px) rotate(-45deg);
+  /* A 44px target in a 48px bar leaves no room outside it for the ring */
+  .nav-toggle:focus-visible {
+    outline-offset: 0;
   }
 
-  .nav-sheet {
-    position: fixed;
-    inset: 52px 0 auto;
-    z-index: 99;
-    background: rgba(0, 0, 0, 0.94);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    padding: 1rem var(--gutter) 2rem;
-    display: grid;
-    /* Collapsed by default; grid-template-rows animates cleanly. */
-    grid-template-rows: 0fr;
-    opacity: 0;
-    pointer-events: none;
-    transition: grid-template-rows 0.45s var(--ease), opacity 0.3s var(--ease),
-      padding 0.45s var(--ease);
-  }
-  .nav-sheet[data-open] {
-    grid-template-rows: 1fr;
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .nav-sheet > * {
-    min-height: 0;
-  }
-
-  .nav-sheet a {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 0;
-    color: var(--text);
-    text-decoration: none;
-    font-size: 1.5rem;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    border-bottom: 1px solid var(--hairline);
-    overflow: hidden;
-  }
-  .nav-sheet a span {
-    color: var(--text-dim);
-  }
-  .nav-sheet-cta {
-    color: var(--accent) !important;
+  /* Without script the Index button would do nothing; the cover's contents list carries the links */
+  @media (scripting: none) {
+    .nav-toggle {
+      display: none;
+    }
   }
 
   @media (min-width: 900px) {
-    .nav-links,
-    .nav-cta {
+    .nav-links {
       display: flex;
     }
-    .nav-burger,
-    .nav-sheet {
+    .nav-row > .nav-toggle {
       display: none;
     }
+  }
+  /* From 1100px the running head starts on the fifth column line, where the cover's masthead starts */
+  @media (min-width: 1100px) {
+    .nav-mark {
+      width: calc(100% / 3 - var(--gap) * 2 / 3);
+      margin-right: 0;
+    }
+    .nav-here {
+      display: grid;
+    }
+  }
+
+  /* ---- Sheet (under 900px) ---- */
+  .sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    padding: 0 var(--gutter) max(1.5rem, env(safe-area-inset-bottom));
+    background: var(--ink-0);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .sheet[hidden] {
+    display: none;
+  }
+  @media (min-width: 900px) {
+    .sheet {
+      display: none;
+    }
+  }
+
+  .sheet-top {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .sheet-list {
+    margin: 0;
+    padding: 1rem 0 0;
+    list-style: none;
+  }
+  .sheet-link {
+    display: flex;
+    align-items: baseline;
+    column-gap: 1rem;
+    padding-block: 0.4rem;
+    border-bottom: 1px solid var(--rule);
+    color: var(--paper);
+    text-decoration: none;
+  }
+  .sheet-link:is(:hover, :focus-visible) {
+    background: var(--ink-2);
+  }
+  .sheet-no {
+    flex: none;
+    min-width: 2.25rem;
+  }
+  .sheet-name {
+    font-family: var(--serif-display);
+    font-weight: 300;
+    font-size: clamp(2.5rem, 12vw, 3.5rem);
+    line-height: 0.95;
+    letter-spacing: -0.025em;
+  }
+
+  .sheet-foot {
+    display: grid;
+    margin-top: auto;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--rule);
+  }
+  .sheet-foot a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--paper);
+    text-decoration: none;
+  }
+  .sheet-foot .sheet-mail {
+    font-size: 0.8125rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    color: var(--paper-2);
   }
 </style>

@@ -25,7 +25,7 @@ export const ventures: Venture[] = [
     name: 'Axiom',
     tagline: 'My company',
     blurb:
-      'The studio the twenty client sites ship under, plus the billing platform that runs the back office — quotes, invoices and recurring billing in one place.',
+      'The studio the client sites ship under, plus the billing platform that runs the back office: quotes, invoices and recurring billing in one place.',
     url: 'https://axiom-billing.vercel.app/',
     cta: 'Open Axiom',
     accent: '#2997ff',
@@ -39,11 +39,11 @@ export const ventures: Venture[] = [
     name: 'Drive My CV',
     tagline: 'This portfolio, as a game',
     blurb:
-      'A drivable 3D world built on three.js and cannon-es: real vehicle physics, every client site standing as a billboard, and the CV waiting at the finish line.',
+      'A drivable 3D world built on three.js and Rapier: real vehicle physics, every client site standing as a billboard, and the CV waiting at the finish line.',
     url: '/drive',
     cta: 'Take it for a drive',
     accent: '#6cc0ff',
-    tags: ['three.js', 'cannon-es', 'WebGL', 'Astro'],
+    tags: ['three.js', 'Rapier', 'WebGL', 'Astro'],
     external: false,
   },
 ];

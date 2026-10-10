@@ -1,0 +1,105 @@
+/* Each row is a ruled line of the contents: label left, address right. The accent shutter is the marquee.
+   The host sets --row-h, so the menu is the same height before and after it hydrates. */
+.menu-wrap {
+  width: 100%;
+}
+
+.menu {
+  margin: 0;
+  padding: 0;
+}
+
+.menu__item {
+  height: var(--row-h);
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid;
+}
+
+.menu__item:last-child {
+  border-bottom: 1px solid;
+}
+
+.menu__item-link {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  align-content: center;
+  height: 100%;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+/* The row is a flood, so the shutter is the focus mark; the ring stays inside the clip */
+.menu .menu__item-link:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Display type sits high in its line box (these labels have no descenders), so the label is pushed down to centre the ink in the row */
+.menu__label,
+.marquee__label {
+  padding-top: 0.25em;
+}
+
+.menu__meta {
+  text-align: right;
+}
+
+/* Parked below the row until a tween (or the static rule below) moves it */
+.marquee {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateY(101%);
+}
+
+.marquee__inner-wrap {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.marquee__inner {
+  display: flex;
+  align-items: center;
+  position: relative;
+  height: 100%;
+  width: fit-content;
+}
+
+/* The loop travels one part's width, so the trailing space is padding and not margin */
+.marquee__part {
+  display: flex;
+  align-items: baseline;
+  flex-shrink: 0;
+  column-gap: calc(var(--gap) * 2);
+  padding-right: calc(var(--gap) * 3);
+  white-space: nowrap;
+}
+
+.marquee .marquee__meta {
+  color: inherit;
+}
+
+/* Reduced motion: no tween is attached, so the shutter simply shows while the row is hovered or focused */
+@media (prefers-reduced-motion: reduce) {
+  .menu__item-link:focus-visible ~ .marquee {
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) and (hover: hover) and (pointer: fine) {
+  .menu__item-link:hover ~ .marquee {
+    transform: none;
+  }
+}
+
+@media (max-width: 599px) {
+  .menu__item-link {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+    align-items: start;
+    row-gap: 0.25rem;
+  }
+}

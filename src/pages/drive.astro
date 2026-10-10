@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { moreSites } from '../data/more-sites';
 ---
 
 <Layout
@@ -15,53 +16,70 @@ import Layout from '../layouts/Layout.astro';
     <div class="bar"><i data-progress></i></div>
   </div>
 
-  <!-- Intro -->
+  <!-- Intro: the world is already running behind it -->
   <div class="screen" data-intro hidden>
     <p class="mono">Brandon van Vuuren</p>
     <h1>Drive my CV.</h1>
-    <p class="blurb">
-      Twenty client sites are laid out on the floor. Drive onto one to open it,
-      follow the avenue to the finish for the PDF, and wreck the playground on
-      the way — it keeps score.
-    </p>
+    <p class="blurb">Twenty client sites stand along the street, and {moreSites.length} more are listed in the directory beside Axiom. Pull into a bay to open one, or hold W for the fast lane to the CV, and wreck whatever is in the way: it keeps score.</p>
 
     <ul class="keys">
       <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Drive</span></li>
       <li><kbd>Space</kbd><span>Brake</span></li>
+      <li><kbd>Shift</kbd><span>Boost</span></li>
+      <li><kbd>E</kbd><span>Open</span></li>
       <li><kbd>R</kbd><span>Reset</span></li>
       <li><kbd>H</kbd><span>Horn</span></li>
+      <li><kbd>C</kbd><span>Camera</span></li>
+      <li><kbd>M</kbd><span>Map</span></li>
     </ul>
 
     <button data-start class="start" type="button">Start driving</button>
+    <button class="hud-btn" data-sound type="button" aria-pressed="true">Sound on</button>
     <a class="exit" href="/">Back to the normal site</a>
-    <p class="credit">Vehicle model by <a href="https://kenney.nl" target="_blank" rel="noopener">Kenney</a> (CC0)</p>
+    <p class="credit">3D models by <a href="https://kenney.nl" target="_blank" rel="noopener">Kenney</a> (CC0)</p>
   </div>
 
-  <!-- No WebGL -->
+  <!-- No WebGL 2, a load that failed, or a context that was lost -->
   <div class="screen" data-fallback hidden>
-    <h1>Your browser can&rsquo;t run the 3D version.</h1>
-    <p class="blurb">No problem — here&rsquo;s the same CV, flat.</p>
-    <a class="start" href="/assets/CV Brandon van Vuuren.pdf" target="_blank" rel="noopener">
-      Open the PDF
-    </a>
+    <h1>The 3D version can&rsquo;t run right now.</h1>
+    <p class="blurb">No problem: here&rsquo;s the same CV, flat.</p>
+    <a class="start" href="/assets/CV Brandon van Vuuren.pdf" target="_blank" rel="noopener">Open the PDF</a>
+    <!-- An empty href is this page, query included. -->
+    <a class="exit" href="">Reload</a>
     <a class="exit" href="/">Back to the normal site</a>
   </div>
 
-  <!-- In-game chrome -->
+  <!-- In-game chrome. The map and the timed run append their own button and chip. -->
   <div class="hud" data-hud hidden>
-    <a class="hud-btn" href="/">‹ Exit</a>
+    <a class="hud-btn" href="/">&lsaquo; Exit</a>
     <button class="hud-btn" data-reset type="button">Reset</button>
-    <button class="hud-btn" data-sound type="button" aria-pressed="false">Sound off</button>
-    <p class="hud-tip">WASD · <kbd>Space</kbd> brake · <kbd>R</kbd> reset · <kbd>H</kbd> horn</p>
-    <div class="hud-stat hud-score" title="Props knocked over"><b data-score>0/0</b><span>hit</span></div>
+    <button class="hud-btn" data-sound type="button" aria-pressed="true">Sound on</button>
+    <button class="hud-btn" data-camera type="button">Camera</button>
+    <p class="hud-tip">WASD, Space brake, Shift boost, E open, C camera, M map</p>
+    <div class="hud-stat"><b data-sites>0/20</b><span>sites</span></div>
+    <div class="hud-stat"><b data-secrets>0/3</b><span>secrets</span></div>
+    <div class="hud-stat" title="Props knocked over"><b data-score>0</b><span>hit</span></div>
     <div class="hud-stat"><b data-speed>0</b><span>km/h</span></div>
   </div>
 
-  <aside class="panel" data-panel hidden></aside>
+  <!-- One article.panel per pad, and one .toast at a time: both are built by the game. -->
+  <aside data-panel></aside>
+  <div data-toasts role="status"></div>
 
-  <div class="stick" data-stick hidden>
-    <span data-knob></span>
-  </div>
+  <!-- Touch only -->
+  <button data-open type="button">Open</button>
+  <div data-stick><span data-knob></span></div>
+  <button data-brake type="button">Brake</button>
+  <button data-boost type="button">Boost</button>
+
+  <!-- Covers the jump of a reset and of a camera switch -->
+  <div data-fade></div>
+
+  {
+    /* On a phone the dev toolbar's hit box lies over Brake, and a drive test on the dev server
+       has to be able to brake. */
+    import.meta.env.DEV && <style is:inline>astro-dev-toolbar { display: none; }</style>
+  }
 
   <script>
     import '../game/main.ts';
@@ -69,16 +87,45 @@ import Layout from '../layouts/Layout.astro';
 </Layout>
 
 <style is:global>
+  /*
+   * One global block, on purpose. Astro scopes a plain style block to the elements that exist at
+   * build time (.hud-btn compiles to .hud-btn[data-astro-cid-...]), and the game builds panels,
+   * toasts, chips and buttons at run time: a scoped rule never reaches them. Only this page loads
+   * this sheet, so nothing leaks.
+   *
+   * The classes other modules build from, without writing CSS of their own:
+   *   .screen       a full-screen state
+   *   .hud-btn      a button or a link, anywhere
+   *   .hud-stat     a chip: a b for the number and a span for its unit
+   *   .panel        an article inside [data-panel]: closed until it gets .is-active
+   *   .toast        a b for the title and a span for the line, inside [data-toasts]
+   *   [data-open]   the touch Open button: shown while it has .is-active
+   *
+   * Nothing here blurs what is behind it. A backdrop-filter over a canvas that repaints at 144 Hz
+   * cost 37 extra missed frames in 80 s, so every fill is solid and nearly opaque instead.
+   */
   body.is-bare {
+    /* The fill of everything that floats over the canvas. */
+    --fill: rgba(10, 10, 10, 0.86);
+    /* Clear of the notch, the rounded corners and the home indicator. */
+    --top: max(1rem, env(safe-area-inset-top));
+    --left: max(var(--gutter), env(safe-area-inset-left));
+    --right: max(var(--gutter), env(safe-area-inset-right));
+    --bottom: max(var(--gutter), env(safe-area-inset-bottom) + 0.5rem);
     overflow: hidden;
     height: 100svh;
     overscroll-behavior: none;
     touch-action: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
-</style>
 
-<style>
-  canvas {
+  /* The classes below set display, which would otherwise outrank the hidden attribute. */
+  [hidden] {
+    display: none !important;
+  }
+
+  [data-canvas] {
     position: fixed;
     inset: 0;
     width: 100%;
@@ -93,18 +140,37 @@ import Layout from '../layouts/Layout.astro';
     inset: 0;
     z-index: 20;
     display: grid;
+    /* Safe: on a phone held sideways the intro is taller than the screen, and scrolls. */
     align-content: center;
+    align-content: safe center;
     justify-items: center;
     gap: 1rem;
+    overflow-y: auto;
+    touch-action: pan-y;
     text-align: center;
     padding: 2rem var(--gutter);
     background:
       radial-gradient(55% 45% at 50% 40%, rgba(41, 151, 255, 0.16), transparent 70%),
       rgba(0, 0, 0, 0.92);
-    backdrop-filter: blur(8px);
   }
-  .screen[hidden] {
-    display: none;
+
+  /*
+   * Start fades the intro off the world that has been running behind it. A browser that cannot
+   * transition display drops the whole declaration, and there the intro just goes.
+   */
+  [data-intro] {
+    transition:
+      opacity 0.4s var(--ease),
+      display 0.4s allow-discrete;
+  }
+  [data-intro][hidden] {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Opaque: it can go up over a game that stopped mid-drive with its HUD still showing. */
+  [data-fallback] {
+    background-color: #000;
   }
 
   .mono {
@@ -141,6 +207,8 @@ import Layout from '../layouts/Layout.astro';
     flex-wrap: wrap;
     justify-content: center;
     gap: 0.6rem 1.5rem;
+    /* Two rows of four: the keys that drive, then the keys that do something. */
+    max-width: 30rem;
     list-style: none;
     margin: 1rem 0 0.5rem;
     padding: 0;
@@ -180,7 +248,9 @@ import Layout from '../layouts/Layout.astro';
     letter-spacing: -0.012em;
     text-decoration: none;
     cursor: pointer;
-    transition: background 0.25s var(--ease), transform 0.25s var(--ease);
+    transition:
+      background 0.25s var(--ease),
+      transform 0.25s var(--ease);
   }
   .start:hover {
     background: var(--accent-hi);
@@ -229,29 +299,46 @@ import Layout from '../layouts/Layout.astro';
     inset: 0 0 auto;
     z-index: 10;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 1rem;
-    padding: 1rem var(--gutter);
+    /* Chips that do not fit drop to a second row under the others, not under Exit. */
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: var(--top) var(--right) 0 var(--left);
     pointer-events: none;
-  }
-  .hud[hidden] {
-    display: none;
   }
   .hud > * {
     pointer-events: auto;
+  }
+  /*
+   * Buttons on the left and chips on the right, whatever order they were appended in. The space
+   * between the two groups is this spacer, which a phone turns into a line break.
+   */
+  .hud > .hud-btn {
+    order: 1;
+  }
+  .hud::after {
+    content: '';
+    order: 2;
+    flex: 1 1 0;
+  }
+  .hud > .hud-stat {
+    order: 3;
   }
 
   .hud-btn {
     font: inherit;
     font-size: 0.8125rem;
     font-weight: 550;
+    line-height: 1.5;
     padding: 0.45rem 0.9rem;
     border-radius: 980px;
     color: var(--text);
-    background: rgba(12, 12, 14, 0.7);
+    background: var(--fill);
     border: 1px solid var(--hairline);
-    backdrop-filter: blur(12px);
+    text-align: center;
     text-decoration: none;
+    white-space: nowrap;
     cursor: pointer;
   }
   .hud-btn:hover {
@@ -268,81 +355,93 @@ import Layout from '../layouts/Layout.astro';
     gap: 0.3rem;
     padding: 0.4rem 0.9rem;
     border-radius: 980px;
-    background: rgba(12, 12, 14, 0.7);
+    background: var(--fill);
     border: 1px solid var(--hairline);
-    backdrop-filter: blur(12px);
+    line-height: 1.2;
     font-variant-numeric: tabular-nums;
-  }
-  .hud-score {
-    margin-left: auto;
+    white-space: nowrap;
   }
   .hud-stat b {
     font-size: 1.125rem;
     font-weight: 650;
     letter-spacing: -0.02em;
-    min-width: 2.2ch;
-    text-align: right;
   }
   .hud-stat span {
     font-size: 0.6875rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
+  }
+  /* Three digits wide, so the row does not shuffle each time the speed passes 10 and 100. */
+  [data-speed] {
+    min-width: 3ch;
+    text-align: right;
   }
 
+  /* Out of the row: bottom left, where a phone has its stick. */
   .hud-tip {
     display: none;
+    position: fixed;
+    left: var(--left);
+    bottom: var(--bottom);
     margin: 0;
+    padding: 0.45rem 0.9rem;
+    border-radius: 980px;
+    background: var(--fill);
+    border: 1px solid var(--hairline);
     font-size: 0.75rem;
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
 
-  /* --- Project panel -------------------------------------------------- */
-  .panel {
+  /* --- Pad panels ------------------------------------------------------ */
+  [data-panel] {
     position: fixed;
     z-index: 15;
-    left: var(--gutter);
-    right: var(--gutter);
-    bottom: 1rem;
-    max-width: 420px;
+  }
+  /* Every pad's panel is stacked on the same spot, and one of them is open. */
+  .panel {
+    position: absolute;
+    inset: auto 0 0;
     padding: 1.4rem;
     border-radius: 20px;
-    background: rgba(10, 10, 12, 0.86);
+    background: rgba(10, 10, 12, 0.94);
     border: 1px solid var(--hairline-strong);
-    backdrop-filter: blur(20px);
-    animation: panel-in 0.45s var(--ease-out) both;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(16px);
+    /* Closing is the quicker of the two, so two panels swapping never read as one. */
+    transition:
+      opacity 0.15s var(--ease),
+      transform 0.15s var(--ease),
+      visibility 0s 0.15s;
   }
-  .panel[hidden] {
-    display: none;
+  .panel.is-active {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition:
+      opacity 0.45s var(--ease-out),
+      transform 0.45s var(--ease-out);
   }
-  @keyframes panel-in {
-    from {
-      opacity: 0;
-      transform: translateY(16px);
-    }
-  }
-</style>
-
-<style is:global>
-  /* Panel contents are injected by the game, so these live in global scope. */
   .panel .panel-kicker {
     margin: 0 0 0.35rem;
     font-size: 0.6875rem;
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: #2997ff;
+    color: var(--accent);
   }
   .panel h2 {
     margin: 0 0 0.5rem;
     font-size: 1.25rem;
     font-weight: 650;
+    line-height: 1.2;
     letter-spacing: -0.02em;
-    color: #f5f5f7;
+    color: var(--text);
   }
   .panel .panel-desc {
     margin: 0;
     font-size: 0.8125rem;
     line-height: 1.55;
-    color: #a1a1a6;
+    color: var(--text-muted);
     display: -webkit-box;
     -webkit-line-clamp: 4;
     -webkit-box-orient: vertical;
@@ -358,77 +457,183 @@ import Layout from '../layouts/Layout.astro';
   }
   .panel .panel-tech li {
     font-size: 0.6875rem;
-    color: #a1a1a6;
+    color: var(--text-muted);
     padding: 0.2rem 0.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid var(--hairline);
     border-radius: 980px;
+  }
+  /* A site pad has no description and no tags: built empty, they take no room. */
+  .panel .panel-desc:empty,
+  .panel .panel-tech:empty {
+    display: none;
   }
   .panel .panel-shot {
     display: block;
     width: 100%;
+    /* The cards are 900 x 563 and arrive late: the box is theirs from the start. */
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
     margin-top: 0.85rem;
     border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid var(--hairline);
+    background: var(--surface);
   }
   .panel .panel-links {
     display: flex;
+    align-items: center;
     gap: 1.1rem;
     margin-top: 0.9rem;
   }
   .panel .panel-links a {
     font-size: 0.875rem;
     font-weight: 500;
-    color: #2997ff;
+    color: var(--accent);
     text-decoration: none;
   }
   .panel .panel-links a:hover {
-    color: #6cc0ff;
+    color: var(--accent-hi);
   }
   /* The live site is the point of the pad, so it is the button and the
      gallery link is the aside, not two links of equal weight. */
   .panel .panel-links a.primary {
     padding: 0.42rem 0.85rem;
     border-radius: 999px;
-    background: #2997ff;
+    background: var(--accent);
     color: #06121f;
     font-weight: 600;
   }
   .panel .panel-links a.primary:hover {
-    background: #6cc0ff;
+    background: var(--accent-hi);
     color: #06121f;
   }
   .panel .panel-links a.muted {
-    align-self: center;
     color: #97a2b2;
   }
-</style>
+  /* The directory: every other site under category headings, one scrolling list inside the
+     card. The directory module sets up the list (class and headings) on the first visit. */
+  .panel .panel-links.is-index {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    max-height: min(40vh, 21rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* The page turns touch scrolling off, and the list is the one thing a thumb should move. */
+    touch-action: pan-y;
+    scrollbar-width: thin;
+    scrollbar-color: var(--hairline-strong) transparent;
+  }
+  .panel .panel-links.is-index a {
+    padding: 0.35rem 0;
+  }
+  .panel .panel-group {
+    margin: 0.7rem 0 0.15rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--hairline);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .panel .panel-group:first-child {
+    margin-top: 0;
+  }
+  .panel .panel-enter {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0.9rem 0 0;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
 
-<style>
-  /* --- Touch joystick -------------------------------------------------- */
-  .stick {
+  /* --- Toasts ---------------------------------------------------------- */
+  [data-toasts] {
+    position: fixed;
+    inset: calc(var(--top) + 3.25rem) var(--right) auto var(--left);
+    z-index: 16;
+    display: grid;
+    justify-items: center;
+    pointer-events: none;
+  }
+  .toast {
+    /* One spot, however many the queue leaves in the container. */
+    grid-area: 1 / 1;
+    display: grid;
+    gap: 0.1rem;
+    max-width: 100%;
+    padding: 0.6rem 1.2rem;
+    border-radius: 16px;
+    background: var(--fill);
+    border: 1px solid var(--hairline-strong);
+    text-align: center;
+    /* The whole life of a toast: the queue moves on at animationend. */
+    animation: toast 4s var(--ease-out) both;
+  }
+  .toast b {
+    font-size: 0.875rem;
+    font-weight: 650;
+    color: var(--text);
+  }
+  .toast span {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+  @keyframes toast {
+    0%,
+    100% {
+      opacity: 0;
+      transform: translateY(-12px);
+    }
+    8%,
+    92% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes toast-still {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    8%,
+    92% {
+      opacity: 1;
+    }
+  }
+
+  /* --- Touch controls -------------------------------------------------- */
+  [data-stick],
+  [data-brake],
+  [data-boost],
+  [data-open] {
     position: fixed;
     z-index: 15;
-    left: 1.25rem;
-    bottom: 1.25rem;
+    touch-action: none;
+  }
+  /* They come and go with the HUD: nothing to steer before Start. */
+  .hud[hidden] ~ :is([data-stick], [data-brake], [data-boost], [data-open]) {
+    display: none;
+  }
+
+  [data-stick] {
+    left: var(--left);
+    bottom: var(--bottom);
+    display: grid;
+    place-items: center;
     width: 132px;
     height: 132px;
     border-radius: 50%;
-    background: rgba(12, 12, 14, 0.5);
+    background: rgba(10, 10, 10, 0.55);
     border: 1px solid var(--hairline);
-    backdrop-filter: blur(10px);
-    display: grid;
-    place-items: center;
-    touch-action: none;
+    opacity: 0.6;
     transition: opacity 0.3s var(--ease);
-    opacity: 0.55;
   }
-  .stick[hidden] {
-    display: none;
-  }
-  .stick[data-active] {
+  [data-stick][data-active] {
     opacity: 1;
   }
-  .stick span {
+  [data-knob] {
     width: 54px;
     height: 54px;
     border-radius: 50%;
@@ -437,19 +642,276 @@ import Layout from '../layouts/Layout.astro';
     pointer-events: none;
   }
 
-  /* Desktop: keyboard is the input, so the stick goes away and tips appear. */
+  /* Pedal order: the brake to the left of the one that makes it go. */
+  [data-brake],
+  [data-boost] {
+    bottom: var(--bottom);
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    font: inherit;
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text);
+    background: rgba(10, 10, 10, 0.55);
+    border: 1px solid var(--hairline-strong);
+  }
+  [data-boost] {
+    right: var(--right);
+  }
+  [data-brake] {
+    right: calc(var(--right) + 64px + 0.625rem);
+  }
+  [data-brake]:active,
+  [data-boost]:active {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* Above the two of them and as wide, when the pad under the car has a link. */
+  [data-open] {
+    right: var(--right);
+    bottom: calc(var(--bottom) + 64px + 0.625rem);
+    width: calc(128px + 0.625rem);
+    height: 44px;
+    border-radius: 980px;
+    font: inherit;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #06121f;
+    background: var(--accent);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(8px);
+    transition:
+      opacity 0.15s var(--ease),
+      transform 0.15s var(--ease),
+      visibility 0s 0.15s;
+  }
+  [data-open].is-active {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition:
+      opacity 0.3s var(--ease-out),
+      transform 0.3s var(--ease-out);
+  }
+
+  /* --- Fade ------------------------------------------------------------ */
+  /* Over the canvas and under the HUD: the world blinks, the chrome does not. */
+  [data-fade] {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* --- A mouse and a keyboard ------------------------------------------ */
   @media (hover: hover) and (pointer: fine) {
-    .stick {
+    [data-stick],
+    [data-brake],
+    [data-boost],
+    [data-open] {
       display: none;
     }
-    .hud-tip {
-      display: block;
+    [data-panel] {
+      right: var(--right);
+      bottom: var(--bottom);
+      width: min(380px, 100vw - 2 * var(--gutter));
     }
+    @media (min-width: 900px) {
+      .hud-tip {
+        display: block;
+      }
+    }
+  }
+
+  /* --- Touch ----------------------------------------------------------- */
+  @media not all and (hover: hover) and (pointer: fine) {
+    /* A sheet above the stick, between the gutters. */
+    [data-panel] {
+      left: var(--left);
+      right: var(--right);
+      bottom: calc(var(--bottom) + 132px + 0.625rem);
+      max-width: 420px;
+      margin-inline: auto;
+    }
+    /* A tablet has room between the stick and the pedals instead. */
+    @media (min-width: 660px) {
+      [data-panel] {
+        left: calc(var(--left) + 132px + 0.625rem);
+        right: calc(var(--right) + 128px + 1.25rem);
+        bottom: var(--bottom);
+      }
+    }
+    /*
+     * The sheet lies between the parked car and the thumbs, and on a 390 x 844 phone that gap is
+     * 166 px. So the card (a site has one) or the tags (Axiom has those) go beside the name and
+     * not under it, the description stops at two lines, and the E hint goes, since Open is under
+     * the right thumb.
+     */
     .panel {
-      left: auto;
-      right: var(--gutter);
-      bottom: var(--gutter);
-      width: 380px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: 0.75rem;
+      padding: 0.9rem 1rem;
+      border-radius: 16px;
+    }
+    .panel > * {
+      grid-column: 1;
+    }
+    .panel h2 {
+      margin-bottom: 0.35rem;
+      font-size: 1.0625rem;
+    }
+    .panel .panel-shot,
+    .panel .panel-tech {
+      grid-area: 1 / 2 / span 2;
+      margin: 0;
+    }
+    .panel .panel-shot {
+      align-self: center;
+      width: 6.5rem;
+    }
+    .panel .panel-tech {
+      align-self: start;
+      justify-content: flex-end;
+      max-width: 9.5rem;
+    }
+    .panel .panel-desc,
+    .panel .panel-links {
+      grid-column: 1 / -1;
+    }
+    .panel .panel-desc {
+      -webkit-line-clamp: 2;
+    }
+    .panel .panel-links {
+      margin-top: 0.75rem;
+    }
+    /* The directory sheet covers the car while it is read, so it stays short and scrolls; its
+       headings already say what the tags would. */
+    .panel .panel-links.is-index {
+      max-height: min(26vh, 12rem);
+    }
+    .panel:has(.is-index) .panel-tech {
+      display: none;
+    }
+    .panel .panel-enter {
+      display: none;
+    }
+    /*
+     * A phone held sideways: the car parks in the lower middle of the screen, which is where the
+     * sheet would lie. It goes above the pedals instead, with the name and the links alone.
+     */
+    @media (min-width: 660px) and (max-height: 480px) {
+      [data-panel] {
+        left: auto;
+        right: var(--right);
+        bottom: calc(var(--bottom) + 108px + 1.25rem);
+        width: min(280px, 42vw);
+      }
+      .panel .panel-desc,
+      .panel .panel-tech,
+      .panel .panel-shot {
+        display: none;
+      }
+      /* Under the HUD's chips: the list is two rows and a scroll. */
+      .panel .panel-links.is-index {
+        max-height: 18vh;
+      }
+    }
+  }
+
+  /* --- Narrower than a desktop ----------------------------------------- */
+  /*
+   * The number stands on its unit: six chips this way are as wide as four side by side, and a
+   * phone held sideways keeps its HUD on one line.
+   */
+  @media (max-width: 1199px) {
+    .hud {
+      gap: 0.375rem;
+    }
+    .hud-btn {
+      padding-inline: 0.7rem;
+    }
+    .hud-stat {
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      padding: 0.3rem 0.5rem;
+      border-radius: 0.875rem;
+    }
+    .hud-stat b {
+      font-size: 0.9375rem;
+    }
+    .hud-stat span {
+      font-size: 0.625rem;
+    }
+    [data-speed] {
+      text-align: center;
+    }
+  }
+
+  /* --- A phone, upright ------------------------------------------------ */
+  /* Two rows that each fill the width: buttons, then chips. */
+  @media (max-width: 640px) {
+    .hud {
+      /* The line break is a row of its own, so the gap between the two rows counts twice. */
+      row-gap: 0.1875rem;
+    }
+    .hud::after {
+      flex-basis: 100%;
+    }
+    .hud > .hud-btn {
+      flex: 1 1 auto;
+    }
+    .hud > .hud-stat {
+      flex: 1 1 0;
+    }
+    .hud-btn {
+      padding: 0.5rem 0.55rem;
+      font-size: 0.75rem;
+    }
+    .hud-stat {
+      padding-inline: 0.25rem;
+    }
+    [data-toasts] {
+      top: calc(var(--top) + 5.75rem);
+    }
+  }
+
+  /* --- A phone held sideways --------------------------------------------- */
+  /* Tightened until Start sits whole on the first screen: the rest scrolls. */
+  @media (max-height: 480px) {
+    .screen {
+      gap: 0.5rem;
+      padding-block: 1rem;
+    }
+    .screen h1 {
+      font-size: 2.5rem;
+    }
+    .keys {
+      margin-block: 0.25rem;
+    }
+    .start {
+      margin-top: 0.25rem;
+    }
+  }
+
+  /* --- Reduced motion --------------------------------------------------- */
+  /* global.css already cuts every transition and animation to nothing: these drop the slides. */
+  @media (prefers-reduced-motion: reduce) {
+    .panel,
+    [data-open] {
+      transform: none;
+    }
+    /* A toast still has to stay up for its four seconds, so it keeps them and only fades. */
+    .toast {
+      animation: toast-still 4s linear both !important;
     }
   }
 </style>

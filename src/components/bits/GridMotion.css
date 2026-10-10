@@ -1,0 +1,55 @@
+.grid-motion {
+  --gm-tile: var(--ink-2);
+  --gm-border: var(--rule);
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.grid-motion__plane {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  opacity: 0;
+}
+
+.grid-motion__row {
+  position: absolute;
+  left: 0;
+  display: flex;
+  gap: var(--gm-gap);
+  will-change: transform;
+}
+
+.grid-motion__tile {
+  position: relative;
+  flex: none;
+  width: var(--gm-tile-w);
+  height: var(--gm-tile-h);
+  overflow: hidden;
+  background: var(--gm-tile);
+  opacity: calc(1 - var(--gm-dim) * (1 - var(--spot, 0)));
+}
+
+.grid-motion__tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--gm-border);
+  pointer-events: none;
+}
+
+.grid-motion--gray .grid-motion__tile {
+  filter: grayscale(calc(1 - var(--spot, 0)));
+}
+
+.grid-motion__tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}

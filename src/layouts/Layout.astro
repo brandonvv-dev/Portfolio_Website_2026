@@ -9,10 +9,15 @@ interface Props {
 }
 
 const {
-  title = 'Brandon van Vuuren — Full-stack Developer & AI Engineer',
+  title = 'Brandon van Vuuren | Full-stack Developer & AI Engineer',
   description = 'Brandon van Vuuren builds production systems across React, .NET, Python and AI. Selected work, live repositories, and a CV you can drive through.',
   bare = false,
 } = Astro.props;
+
+const preloadedFonts = ['newsreader-display-300', 'newsreader-text-400', 'plex-mono-400'];
+// Crawlers need an absolute URL, which exists once astro.config.mjs sets `site`
+const ogPath = '/images/axiom/eden-barbershop/card.webp';
+const ogImage = Astro.site ? new URL(ogPath, Astro.site).href : ogPath;
 ---
 
 <!doctype html>
@@ -22,7 +27,7 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content={bare ? '#000000' : '#0b0a09'} />
     <meta name="color-scheme" content="dark" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 
@@ -30,18 +35,38 @@ const {
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..800&display=swap"
-    />
+    {
+      bare ? (
+        <>
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+          <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..800&display=swap"
+          />
 
-    <style is:inline>
-      /* Paint black before anything else loads — no white flash. */
-      html { background: #000; }
-      body { margin: 0; background: #000; color: #f5f5f7; }
-    </style>
+          <style is:inline>
+            /* Paint black before anything else loads, no white flash. */
+            html { background: #000; }
+            body { margin: 0; background: #000; color: #f5f5f7; }
+          </style>
+        </>
+      ) : (
+        <>
+          <meta property="og:image" content={ogImage} />
+          <meta name="twitter:card" content="summary_large_image" />
+          {preloadedFonts.map((font) => (
+            <link rel="preload" href={`/fonts/${font}.woff2`} as="font" type="font/woff2" crossorigin />
+          ))}
+
+          <style is:inline>
+            /* Paint the warm black before the stylesheet arrives, no white flash. */
+            html { background: #0b0a09; }
+            body { margin: 0; background: #0b0a09; color: #ebe5d6; }
+          </style>
+        </>
+      )
+    }
 
     <slot name="head" />
   </head>

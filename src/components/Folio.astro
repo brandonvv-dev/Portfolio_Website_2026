@@ -1,0 +1,19 @@
+---
+interface Props {
+  name: string;
+  datum?: string;
+  /** Show the section number; the Index inside Sites is a sub-head and has none. */
+  numbered?: boolean;
+}
+
+const { name, datum, numbered = true } = Astro.props;
+---
+
+<div class="folio">
+  <i data-rule></i>
+  <p class="folio-row mono" data-rise>
+    {numbered && <span class="folio-no"></span>}
+    <span>{name}</span>
+    {datum && <span class="folio-datum">{datum}</span>}
+  </p>
+</div>
