@@ -1,0 +1,74 @@
+---
+// Daily views and visitors as an inline SVG drawn on the server. The SVG holds only the lines (it
+// stretches with the page); the figures and dates are HTML so they stay one size on a phone.
+import type { DayPoint } from '../../server/analytics';
+import { dayLabel, num, WEEKDAYS, weekdayOf } from './format';
+
+interface Props {
+  days: readonly DayPoint[];
+}
+
+const { days } = Astro.props;
+const n = days.length;
+const largest = Math.max(...days.map((day) => Math.max(day.views, day.visitors)), 1);
+
+// Four equal bands, each a round number: 1, 2, 3, 4, 5, 6, 8 or 10 times a power of ten.
+const raw = Math.max(largest / 4, 1);
+const power = 10 ** Math.floor(Math.log10(raw));
+const band = ([1, 2, 3, 4, 5, 6, 8, 10].find((m) => m * power >= raw) ?? 10) * power;
+const top = band * 4;
+
+// Each day owns an equal column; its point sits in the middle of it.
+const x = (i: number) => ((i + 0.5) / n) * 1000;
+const y = (v: number) => 100 - (v / top) * 100;
+const line = (pick: (day: DayPoint) => number) => days.map((day, i) => `${x(i).toFixed(1)},${y(pick(day)).toFixed(2)}`).join(' ');
+
+const views = line((day) => day.views);
+const visitors = line((day) => day.visitors);
+const weekends = days.flatMap((day, i) => (weekdayOf(day.day) >= 5 ? [i] : []));
+
+const marks = n <= 7 ? days.map((_, i) => i) : [0, 1, 2, 3, 4].map((k) => Math.round((k * (n - 1)) / 4));
+const total = days.reduce((sum, day) => sum + day.views, 0);
+const peak = days.reduce((best, day) => (day.views > best.views ? day : best), days[0] ?? { day: '', views: 0 });
+const summary = `Daily page views and visitors over ${n} days: ${num(total)} views in all, the most on ${dayLabel(peak.day)} with ${num(peak.views)}.`;
+---
+
+<figure class="adm-chart" role="img" aria-label={summary}>
+  <div class="adm-chart-y" aria-hidden="true">
+    {[0, 1, 2, 3, 4].map((k) => <span class="mono-data" style={`bottom: ${k * 25}%`}>{num(k * band)}</span>)}
+  </div>
+  <div class="adm-chart-plot">
+    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      {weekends.map((i) => <rect class="adm-chart-weekend" x={(i / n) * 1000} y="0" width={1000 / n} height="100" />)}
+      {[0, 25, 50, 75, 100].map((at) => <line class="adm-chart-grid" x1="0" x2="1000" y1={at} y2={at} />)}
+      <polygon class="adm-chart-area" points={`${x(0).toFixed(1)},100 ${views} ${x(n - 1).toFixed(1)},100`} />
+      <polyline class="adm-chart-line adm-chart-visitors" points={visitors} />
+      <polyline class="adm-chart-line adm-chart-views" points={views} />
+    </svg>
+    <div class="adm-chart-cols" style={`--n: ${n}`}>
+      {days.map((day, i) => (
+        <i class="adm-chart-col" data-edge={i < n * 0.15 ? 'start' : i >= n * 0.85 ? 'end' : undefined}>
+          <span class="adm-chart-tip mono-data">
+            <b>{WEEKDAYS[weekdayOf(day.day)]} {dayLabel(day.day)}</b>
+            <span>Views <em>{num(day.views)}</em></span>
+            <span>Visitors <em>{num(day.visitors)}</em></span>
+          </span>
+        </i>
+      ))}
+    </div>
+  </div>
+  <div class="adm-chart-x" aria-hidden="true">
+    {
+      marks.map((i, k) => (
+        <span
+          class="mono-data"
+          style={`left: ${(((i + 0.5) / n) * 100).toFixed(2)}%`}
+          data-edge={n <= 7 ? undefined : k === 0 ? 'start' : k === marks.length - 1 ? 'end' : undefined}
+          data-minor={n > 7 && k % 2 === 1 ? '' : undefined}
+        >
+          {n <= 7 ? WEEKDAYS[weekdayOf(days[i]?.day ?? '')] : dayLabel(days[i]?.day ?? '')}
+        </span>
+      ))
+    }
+  </div>
+</figure>

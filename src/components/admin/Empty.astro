@@ -1,0 +1,14 @@
+---
+interface Props {
+  /** One line on how data arrives. */
+  line: string;
+  title?: string;
+}
+
+const { line, title = 'No data yet' } = Astro.props;
+---
+
+<div class="adm-empty">
+  <p class="adm-empty-title">{title}</p>
+  <p class="mono-data">{line}</p>
+</div>

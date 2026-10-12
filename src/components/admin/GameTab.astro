@@ -1,0 +1,82 @@
+---
+import type { Ranked, Summary } from '../../server/analytics';
+import { delta, funnel, lap, num, dec } from './format';
+import type { Row } from './format';
+import Empty from './Empty.astro';
+import Kpi from './Kpi.astro';
+import Panel from './Panel.astro';
+import Rows from './Rows.astro';
+import Tab from './Tab.astro';
+import { AWARDS, padName, SECRETS } from './names';
+
+interface Props {
+  s: Summary;
+  datum: string;
+}
+
+const { s, datum } = Astro.props;
+const { game: g } = s;
+const since = `${s.range} days`;
+
+const named = (list: readonly Ranked[]): Row[] => list.map(({ key, count }) => ({ label: padName(key), value: count }));
+
+/** Every known id is listed, the ones nobody has reached at zero, then any id the lists below do not know. */
+function known(counts: readonly Ranked[], names: Readonly<Record<string, string>>): Row[] {
+  const seen = new Map(counts.map(({ key, count }) => [key, count]));
+  const rows = Object.entries(names).map(([id, label]) => ({ label, value: seen.get(id) ?? 0 }));
+  const extra = counts.filter(({ key }) => !Object.hasOwn(names, key)).map(({ key, count }) => ({ label: key, value: count }));
+  return [...rows, ...extra].sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
+}
+
+const drivers = s.pages.find(({ path }) => path === '/drive')?.visitors ?? 0;
+const steps = funnel([
+  { label: 'Opened the Drive page', value: drivers },
+  { label: 'Pressed start', value: g.visitors },
+  { label: 'Reached a pad', value: g.padVisitors },
+  { label: 'Reached the CV pad', value: g.cvVisitors },
+]);
+
+const played =
+  g.starts + g.pads.length + g.opens.length + g.awards.length + g.secrets.length + g.laps.count + g.lands > 0;
+---
+
+<Tab id="game" title="Game" datum={datum}>
+  {
+    played ? (
+      <>
+        <div class="adm-kpis adm-span-12">
+          <Kpi label="Game starts" value={num(g.starts)} delta={delta(s.totals.gameStarts, s.previous.gameStarts)} since={since} series={s.days.map((d) => d.gameStarts)} />
+          <Kpi label="Players" value={num(g.visitors)} note="visitors who pressed start" />
+          <Kpi label="Laps finished" value={num(g.laps.count)} note="the timed run" />
+          <Kpi label="Best lap" value={g.laps.bestMs ? lap(g.laps.bestMs) : '-'} note="m:ss.s" />
+          <Kpi label="Average lap" value={g.laps.avgMs ? lap(g.laps.avgMs) : '-'} note="m:ss.s" />
+          <Kpi label="Props knocked" value={g.sessions ? dec(g.knockedAvg) : '-'} note="average per session" />
+        </div>
+
+        <Panel label="From the page to the finish" datum="Visitors, each step against the first" span={5}>
+          <Rows rows={steps} base={Math.max(drivers, g.visitors, g.padVisitors, g.cvVisitors)} numbered head={{ value: 'Visitors', note: 'Step', pct: 'Share' }} empty="" />
+        </Panel>
+
+        <Panel label="Pads visited" datum="Driven onto, ranked" span={7}>
+          <Rows rows={named(g.pads)} limit={10} head={{ value: 'Visits' }} empty="Each pad the car reaches is counted once per session." />
+        </Panel>
+
+        <Panel label="Opened with E or the button" datum="Links followed from a pad" span={7}>
+          <Rows rows={named(g.opens)} limit={10} head={{ value: 'Opens' }} empty="Pressing E or the button on a pad that has a link is counted here." />
+        </Panel>
+
+        <Panel label="Secrets found" datum={`${Object.keys(SECRETS).length} hidden places`} span={5}>
+          <Rows rows={known(g.secrets, SECRETS)} lead={false} head={{ value: 'Found' }} empty="" />
+        </Panel>
+
+        <Panel label="Awards unlocked" datum={`${num(g.lands)} big landings`} span={12}>
+          <Rows rows={known(g.awards, AWARDS)} limit={12} lead={false} head={{ value: 'Unlocked' }} empty="" />
+        </Panel>
+      </>
+    ) : (
+      <div class="adm-span-12">
+        <Empty line="Starts, pads, awards and laps arrive from the Drive page as it is played." />
+      </div>
+    )
+  }
+</Tab>

@@ -1,0 +1,21 @@
+---
+// One numbered section of a tab: a hairline, a mono running head, then the content.
+interface Props {
+  label: string;
+  /** Right of the head: a unit, a period, a legend. */
+  datum?: string;
+  /** Columns of the twelve it takes from 900 px up; narrower screens stack. */
+  span?: 3 | 4 | 5 | 6 | 7 | 8 | 12;
+}
+
+const { label, datum, span = 12 } = Astro.props;
+---
+
+<section class:list={['adm-sec', `adm-span-${span}`]}>
+  <header class="adm-sec-head">
+    <h3 class="mono"><span class="adm-no" aria-hidden="true"></span>{label}</h3>
+    {datum && <p class="mono-data">{datum}</p>}
+    <slot name="aside" />
+  </header>
+  <slot />
+</section>

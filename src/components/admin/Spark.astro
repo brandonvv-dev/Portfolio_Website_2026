@@ -1,0 +1,17 @@
+---
+interface Props {
+  values: readonly number[];
+}
+
+const { values } = Astro.props;
+const W = 100;
+const H = 24;
+const top = Math.max(...values, 1);
+const step = values.length > 1 ? W / (values.length - 1) : 0;
+const points = values.map((v, i) => `${(i * step).toFixed(2)},${(H - 1 - (v / top) * (H - 2)).toFixed(2)}`);
+---
+
+<svg class="adm-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true" focusable="false">
+  <polygon class="adm-spark-fill" points={`0,${H} ${points.join(' ')} ${((values.length - 1) * step).toFixed(2)},${H}`} />
+  <polyline class="adm-spark-line" points={points.join(' ')} />
+</svg>

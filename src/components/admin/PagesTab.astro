@@ -1,0 +1,52 @@
+---
+import { SECTIONS } from '../../server/analytics';
+import type { Summary } from '../../server/analytics';
+import { funnel, num } from './format';
+import type { Row } from './format';
+import Panel from './Panel.astro';
+import Rows from './Rows.astro';
+import Tab from './Tab.astro';
+import { pageName } from './names';
+
+interface Props {
+  s: Summary;
+  datum: string;
+}
+
+const { s, datum } = Astro.props;
+
+const pages: Row[] = s.pages.map((page) => ({ ...pageName(page.path), value: page.views, extra: num(page.visitors) }));
+
+// The home page from the top down, in the order it is laid out. The store only keeps these ids,
+// and the type makes a section added there without a name here a build error.
+const NAMES: Record<(typeof SECTIONS)[number], string> = {
+  top: 'Hero',
+  work: 'Work',
+  sites: 'Sites',
+  ventures: 'Ventures',
+  about: 'About',
+  drive: 'Drive',
+  'open-source': 'Source',
+  contact: 'Contact',
+};
+const reached = new Map(s.sections.map(({ key, count }) => [key, count]));
+const steps = s.sections.length ? SECTIONS.map((id) => ({ label: NAMES[id], value: reached.get(id) ?? 0 })) : [];
+const top = Math.max(...steps.map((step) => step.value), 0);
+---
+
+<Tab id="pages" title="Pages" datum={datum}>
+  <Panel label="Top pages" datum="Visitors are counted per day" span={5}>
+    <Rows rows={pages} head={{ value: 'Views', extra: 'Visitors' }} empty="Each page load sends a view from the site within ten seconds." />
+  </Panel>
+
+  <Panel label="Home page, section by section" datum="Visits that scrolled to each section" span={7}>
+    <Rows
+      rows={funnel(steps)}
+      base={top}
+      numbered
+      limit={12}
+      head={{ value: 'Visits', note: 'Step', pct: 'Reached' }}
+      empty="A section counts the first time it crosses the middle of the screen, once per page load."
+    />
+  </Panel>
+</Tab>

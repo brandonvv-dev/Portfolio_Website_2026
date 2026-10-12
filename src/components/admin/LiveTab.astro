@@ -1,0 +1,50 @@
+---
+import type { LiveView } from './format';
+import { num } from './format';
+import Empty from './Empty.astro';
+import FeedRow from './FeedRow.astro';
+import Kpi from './Kpi.astro';
+import Panel from './Panel.astro';
+import Tab from './Tab.astro';
+
+interface Props {
+  live: LiveView;
+}
+
+const { live } = Astro.props;
+const busiest = Math.max(...live.bars);
+const peak = Math.max(busiest, 1);
+const hasHits = live.hits.length > 0;
+---
+
+<Tab id="live" title="Live" datum="Last 24 hours · refreshes every 15 seconds while this page is open">
+  <div class="adm-kpis adm-span-12" data-cols="3" data-live-root data-now={live.now}>
+    <Kpi label="Visitors, last 5 minutes" value={num(live.m5)} live="m5" note="people on the site now" />
+    <Kpi label="Visitors, last 30 minutes" value={num(live.m30)} live="m30" note="distinct visitors" />
+    <Kpi label="Visitors, last 60 minutes" value={num(live.m60)} live="m60" note="distinct visitors" />
+  </div>
+
+  <Panel label="Hits per minute" datum="Last 60 minutes" span={12}>
+    <div class="adm-bars-wrap">
+      <div class="adm-bars" data-live-bars role="img" aria-label="Hits per minute over the last hour">
+        {live.bars.map((hits, i) => (
+          <i class:list={{ 'is-zero': hits === 0 }} style={`--h: ${(hits / peak).toFixed(3)}`} title={`${hits} ${hits === 1 ? 'hit' : 'hits'}, ${59 - i} min ago`} />
+        ))}
+      </div>
+      <p class="adm-bars-axis mono-data" aria-hidden="true">
+        <span>60 min ago</span><span data-live-peak>peak {busiest} per minute</span><span>now</span>
+      </p>
+    </div>
+  </Panel>
+
+  <Panel label="Newest hits" span={12}>
+    <p slot="aside" class="mono-data" data-live-stamp></p>
+    <div data-live-empty hidden={hasHits}>
+      <Empty line="Hits appear here within ten seconds of a visit; nothing has arrived in the last 24 hours." />
+    </div>
+    <ol class="adm-feed" data-live-list hidden={!hasHits}>
+      {live.hits.map((row) => <FeedRow row={row} now={live.now} />)}
+    </ol>
+    <template data-live-row><FeedRow /></template>
+  </Panel>
+</Tab>

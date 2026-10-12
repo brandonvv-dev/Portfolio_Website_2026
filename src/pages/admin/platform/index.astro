@@ -1,0 +1,100 @@
+---
+import Admin from '../../../layouts/Admin.astro';
+import '../../../styles/admin.css';
+import ClicksTab from '../../../components/admin/ClicksTab.astro';
+import Empty from '../../../components/admin/Empty.astro';
+import GameTab from '../../../components/admin/GameTab.astro';
+import Header from '../../../components/admin/Header.astro';
+import LiveTab from '../../../components/admin/LiveTab.astro';
+import Login from '../../../components/admin/Login.astro';
+import OverviewTab from '../../../components/admin/OverviewTab.astro';
+import PagesTab from '../../../components/admin/PagesTab.astro';
+import TrafficTab from '../../../components/admin/TrafficTab.astro';
+import { dayLabel } from '../../../components/admin/format';
+import type { LiveView } from '../../../components/admin/format';
+import { liveView } from '../../../components/admin/names';
+import { live as readLive, summary } from '../../../server/analytics';
+import type { Summary } from '../../../server/analytics';
+
+export const prerender = false;
+
+const RANGES = [7, 30, 90] as const;
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'pages', label: 'Pages' },
+  { id: 'traffic', label: 'Traffic' },
+  { id: 'clicks', label: 'Clicks' },
+  { id: 'game', label: 'Game' },
+  { id: 'live', label: 'Live' },
+] as const;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// The middleware only lets a visitor without a session reach the sign-in view of this page.
+const { admin } = Astro.locals;
+const asked = Number(Astro.url.searchParams.get('range'));
+const range = RANGES.find((days) => days === asked) ?? 30;
+
+let data: { s: Summary; live: LiveView } | null = null;
+let failed = false;
+if (admin) {
+  try {
+    const now = Date.now();
+    const [s, hits] = await Promise.all([summary(range), readLive(now - DAY_MS)]);
+    data = { s, live: liveView(hits, now) };
+  } catch (error) {
+    failed = true;
+    console.error('[admin] the analytics store did not answer:', error instanceof Error ? error.message : 'unknown error');
+  }
+}
+const datum = data
+  ? `Last ${range} days · ${dayLabel(data.s.from)} to ${dayLabel(data.s.to)} ${data.s.to.slice(0, 4)} · UTC`
+  : '';
+---
+
+<Admin title={admin ? 'Back office' : 'Sign in'}>
+  <script is:inline slot="head" define:vars={{ ids: TABS.map((tab) => tab.id) }}>
+    // Pick the tab before the first paint, so a link to #game does not flash the overview.
+    document.documentElement.dataset.tab = ids.includes(location.hash.slice(1)) ? location.hash.slice(1) : ids[0];
+  </script>
+  <noscript slot="head"><style is:inline>.adm-panel { display: block !important; }</style></noscript>
+
+  {
+    !admin ? (
+      <Login />
+    ) : (
+      <>
+        <Header range={range} ranges={RANGES} tabs={data ? TABS : []} live={data?.live.m5 ?? 0} />
+        <main class="adm-main">
+          {
+            data ? (
+              <>
+                <OverviewTab s={data.s} datum={datum} />
+                <PagesTab s={data.s} datum={datum} />
+                <TrafficTab s={data.s} datum={datum} />
+                <ClicksTab s={data.s} datum={datum} />
+                <GameTab s={data.s} datum={datum} />
+                <LiveTab live={data.live} />
+                <footer class="wrap adm-foot mono-data">
+                  <p>
+                    Times are UTC. A visitor is counted per day, so someone who comes back on another day counts again.
+                    Nothing here identifies a person. Data is kept for 400 days.
+                  </p>
+                </footer>
+              </>
+            ) : (
+              failed && (
+                <div class="wrap adm-wrap adm-fail">
+                  <Empty title="The store did not answer" line="The analytics store could not be read. Nothing was lost; try again in a moment." />
+                  <p class="mono"><a class="link" href="">Try again</a></p>
+                </div>
+              )
+            )
+          }
+        </main>
+        <script>
+          import '../../../scripts/admin.ts';
+        </script>
+      </>
+    )
+  }
+</Admin>

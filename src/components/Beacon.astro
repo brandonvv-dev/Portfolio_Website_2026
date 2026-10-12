@@ -1,0 +1,9 @@
+---
+// The analytics beacon, on every page. It is a component of its own because Astro 5.16 matches the
+// scripts of one file to their places in the template back to front: with this and the motion
+// script both in Layout.astro, the conditional one loaded on /drive and the beacon did not.
+---
+
+<script>
+  import '../scripts/track.ts';
+</script>

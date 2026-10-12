@@ -1,0 +1,37 @@
+---
+import type { Delta } from './format';
+import Spark from './Spark.astro';
+
+interface Props {
+  label: string;
+  value: string;
+  /** Change against the previous period; left out for figures that have no previous period. */
+  delta?: Delta;
+  /** What the previous period was, e.g. '30 days'. */
+  since?: string;
+  /** One value per day, for the sparkline. */
+  series?: readonly number[];
+  /** A quiet line under the value when there is no delta. */
+  note?: string;
+  /** The key the browser script refreshes this value by (the LIVE tab). */
+  live?: string;
+}
+
+const { label, value, delta, since, series, note, live } = Astro.props;
+---
+
+<div class="adm-kpi">
+  <p class="mono">{label}</p>
+  <p class="adm-kpi-value" data-live={live}>{value}</p>
+  {
+    delta ? (
+      <p class="mono-data adm-kpi-delta" data-dir={delta.dir}>
+        {delta.text}
+        {since && delta.dir !== 'none' && <span>vs prev. {since}</span>}
+      </p>
+    ) : (
+      <p class="mono-data adm-kpi-delta">{note ?? ''}&nbsp;</p>
+    )
+  }
+  {series?.some((value) => value > 0) ? <Spark values={series} /> : <span class="adm-spark-gap"></span>}
+</div>

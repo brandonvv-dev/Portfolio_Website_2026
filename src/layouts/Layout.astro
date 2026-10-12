@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import Beacon from '../components/Beacon.astro';
 
 interface Props {
   title?: string;
@@ -73,6 +74,7 @@ const ogImage = Astro.site ? new URL(ogPath, Astro.site).href : ogPath;
 
   <body class={bare ? 'is-bare' : ''}>
     <slot />
+    <Beacon />
     {!bare && <script>import '../scripts/motion.ts';</script>}
   </body>
 </html>

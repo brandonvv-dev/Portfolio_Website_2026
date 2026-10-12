@@ -1,0 +1,66 @@
+---
+import Empty from './Empty.astro';
+import { num, share } from './format';
+import type { Row } from './format';
+
+interface Props {
+  rows: readonly Row[];
+  /** What each share is a share of: the sum of the rows unless told otherwise (a funnel passes its first step). */
+  base?: number;
+  /** Rows beyond this are summarised in one line. */
+  limit?: number;
+  /** Number the rows 01, 02 ... (a funnel is read in order). */
+  numbered?: boolean;
+  /** Column captions above the rows. */
+  head?: { value: string; extra?: string; note?: string; pct?: string };
+  /** One line on how this data arrives, shown when there are no rows. */
+  empty: string;
+  /** Let the first row carry the accent. */
+  lead?: boolean;
+}
+
+const { rows, limit = 8, numbered = false, head, empty, lead = true } = Astro.props;
+const shown = rows.slice(0, limit);
+const hidden = rows.length - shown.length;
+const base = Astro.props.base ?? rows.reduce((sum, row) => sum + row.value, 0);
+const longest = Math.max(...rows.map((row) => row.value), 1);
+const hasNote = rows.some((row) => row.note);
+const hasExtra = rows.some((row) => row.extra);
+const columns = ['minmax(0, 1fr)', hasNote ? '4.25rem' : '', '4.25rem', hasExtra ? '4.5rem' : '', '3.5rem']
+  .filter(Boolean)
+  .join(' ');
+---
+
+{
+  rows.length === 0 ? (
+    <Empty line={empty} />
+  ) : (
+    <ol class="adm-rows" style={`--cols: ${columns}`}>
+      {head && (
+        <li class="adm-row adm-row-head mono" aria-hidden="true">
+          <span />
+          {hasNote && <span>{head.note ?? ''}</span>}
+          <span>{head.value}</span>
+          {hasExtra && <span>{head.extra ?? ''}</span>}
+          <span>{head.pct ?? 'Share'}</span>
+        </li>
+      )}
+      {shown.map((row, i) => (
+        <li class="adm-row" style={`--w: ${((row.value / longest) * 100).toFixed(1)}%`} data-lead={lead && i === 0}>
+          <i class="adm-row-bar" aria-hidden="true" />
+          <span class="adm-row-label">
+            {numbered && <b class="mono" aria-hidden="true">{String(i + 1).padStart(2, '0')}</b>}
+            <span class="adm-row-name" title={row.label}>{row.label}</span>
+            {row.tag && <em class="mono adm-tag" data-tag={row.tag}>{row.tag}</em>}
+            {row.sub && <small class="mono-data" title={row.sub}>{row.sub}</small>}
+          </span>
+          {hasNote && <span class="mono-data adm-dim">{row.note ?? ''}</span>}
+          <span class="mono-data adm-row-value">{num(row.value)}</span>
+          {hasExtra && <span class="mono-data adm-dim">{row.extra ?? ''}</span>}
+          <span class="mono-data adm-dim">{share(row.value, base)}</span>
+        </li>
+      ))}
+      {hidden > 0 && <li class="adm-rows-more mono">+{hidden} more</li>}
+    </ol>
+  )
+}

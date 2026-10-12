@@ -1,0 +1,145 @@
+---
+/**
+ * The back office's front door: one card, two fields, one button. Renders its own <main>.
+ * The form posts to /admin/platform/login, which sends a refusal back here as ?e=bad or ?e=limited;
+ * only those two words are ever looked up, so nothing from the URL reaches the page.
+ */
+const reason = Astro.url.searchParams.get('e');
+const error =
+  reason === 'limited'
+    ? 'Too many attempts. Wait 15 minutes and try again.'
+    : reason === 'bad'
+      ? 'Those details did not match.'
+      : '';
+---
+
+<main class="login">
+  <section class="card" aria-labelledby="login-title">
+    <i class="rule" aria-hidden="true"></i>
+    <h1 id="login-title" class="title">
+      <span class="mono kicker">Back office</span>
+      <span class="mark">Brandon van Vuuren</span>
+    </h1>
+
+    <form method="post" action="/admin/platform/login">
+      <label class="field">
+        <span class="mono">Username</span>
+        <input
+          name="user"
+          type="text"
+          inputmode="email"
+          autocomplete="username"
+          autocapitalize="none"
+          autocorrect="off"
+          spellcheck="false"
+          maxlength="254"
+          required
+          autofocus
+        />
+      </label>
+      <label class="field">
+        <span class="mono">Password</span>
+        <input name="password" type="password" autocomplete="current-password" maxlength="256" required />
+      </label>
+
+      {error && <p class="error mono-data" role="alert">{error}</p>}
+
+      <button class="mono" type="submit">Sign in</button>
+    </form>
+  </section>
+</main>
+
+<style>
+  .login {
+    min-height: 100svh;
+    display: grid;
+    place-items: center;
+    padding: 2.5rem var(--gutter);
+  }
+
+  .card {
+    width: min(100%, 25rem);
+    padding: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+    background: var(--ink-1);
+    border: 1px solid var(--rule);
+  }
+
+  .rule {
+    display: block;
+    height: 1px;
+    background: var(--rule-strong);
+  }
+
+  .title {
+    margin: 1rem 0 2.5rem;
+  }
+  .kicker,
+  .mark {
+    display: block;
+  }
+  .mark {
+    margin-top: 1.25rem;
+    font-family: var(--serif-display);
+    font-size: clamp(2rem, 1.5rem + 2vw, 2.5rem);
+    font-weight: 300;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--paper);
+    text-wrap: balance;
+  }
+
+  .field {
+    display: block;
+    margin-bottom: 1.5rem;
+  }
+  .field input {
+    display: block;
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0;
+    border: 0;
+    border-bottom: 1px solid var(--rule-strong);
+    border-radius: 0;
+    background: transparent;
+    color: var(--paper);
+    font-family: var(--mono);
+    /* 16px: anything smaller makes iOS zoom the page on focus */
+    font-size: 1rem;
+    letter-spacing: 0.01em;
+    transition: border-color 0.3s;
+  }
+  .field input:hover {
+    border-bottom-color: var(--paper-3);
+  }
+  .field input:focus-visible {
+    outline: none;
+    border-bottom-color: var(--accent);
+  }
+  /* Browser autofill paints its own blue; an inset fill in the card colour keeps it warm black */
+  .field input:-webkit-autofill {
+    -webkit-text-fill-color: var(--paper);
+    caret-color: var(--paper);
+    box-shadow: 0 0 0 100px var(--ink-1) inset;
+  }
+
+  .error {
+    margin: 0 0 1.5rem;
+    color: var(--accent);
+  }
+
+  button {
+    display: block;
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.75rem 1rem;
+    border: 0;
+    border-radius: 0;
+    background: var(--paper);
+    color: var(--ink-0);
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  button:is(:hover, :focus-visible) {
+    background: var(--accent);
+  }
+</style>

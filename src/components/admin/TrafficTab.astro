@@ -1,0 +1,40 @@
+---
+import type { Summary } from '../../server/analytics';
+import type { Row } from './format';
+import Panel from './Panel.astro';
+import Rows from './Rows.astro';
+import Tab from './Tab.astro';
+import { countryName, referrerName } from './names';
+
+interface Props {
+  s: Summary;
+  datum: string;
+}
+
+const { s, datum } = Astro.props;
+
+const referrers: Row[] = s.referrers.map(({ key, count }) => ({ label: referrerName(key), value: count }));
+const countries: Row[] = s.countries.map(({ key, count }) => ({
+  label: countryName(key),
+  sub: key,
+  value: count,
+  tag: key === 'ZA' ? 'Home' : undefined,
+}));
+const devices: Row[] = s.devices.map(({ key, count }) => ({ label: key.charAt(0).toUpperCase() + key.slice(1), value: count }));
+const browsers: Row[] = s.browsers.map(({ key, count }) => ({ label: key, value: count }));
+---
+
+<Tab id="traffic" title="Traffic" datum={datum}>
+  <Panel label="Referrers" datum="Views by where the visit came from" span={6}>
+    <Rows rows={referrers} limit={10} head={{ value: 'Views' }} empty="The browser's referrer header, host only; a visit with none shows as direct." />
+  </Panel>
+  <Panel label="Countries" datum="Views by country" span={6}>
+    <Rows rows={countries} limit={10} head={{ value: 'Views' }} empty="Vercel's edge adds the visitor's country; nothing else about them is kept." />
+  </Panel>
+  <Panel label="Devices" datum="Views by device" span={6}>
+    <Rows rows={devices} head={{ value: 'Views' }} empty="Phone, tablet or desktop, read from the user agent when a view arrives." />
+  </Panel>
+  <Panel label="Browsers" datum="Views by browser" span={6}>
+    <Rows rows={browsers} head={{ value: 'Views' }} empty="The browser family, read from the user agent when a view arrives." />
+  </Panel>
+</Tab>

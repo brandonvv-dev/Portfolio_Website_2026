@@ -50,6 +50,7 @@ const CONTENT = [
   'audio',
   'panels',
   'directory',
+  'telemetry',
   'trial',
   'chart',
   'awards',

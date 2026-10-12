@@ -1,0 +1,50 @@
+---
+// Views by weekday and hour (UTC), 7 rows by 24 columns. Colour is the only encoding, in five steps.
+import { num, WEEKDAYS, WEEKDAYS_LONG } from './format';
+
+interface Props {
+  heat: readonly (readonly number[])[];
+}
+
+const { heat } = Astro.props;
+const largest = Math.max(...heat.flatMap((row) => row), 1);
+const hour = (h: number) => `${String(h).padStart(2, '0')}:00`;
+
+// Square-rooted so one busy hour does not turn every other hour black. Five steps, 0 = nothing.
+const level = (v: number) => (v ? Math.min(4, 1 + Math.floor(Math.sqrt(v / largest) * 4 - 1e-9)) : 0);
+
+let best = { day: 0, hour: 0, views: 0 };
+heat.forEach((row, d) => row.forEach((views, h) => { if (views > best.views) best = { day: d, hour: h, views }; }));
+const busiest = best.views
+  ? `Busiest: ${WEEKDAYS_LONG[best.day]} ${hour(best.hour)} to ${hour((best.hour + 1) % 24)} UTC, ${num(best.views)} views`
+  : '';
+---
+
+<div class="adm-heat-wrap">
+  <div class="adm-heat" role="img" aria-label={busiest || 'Views by weekday and hour'}>
+    <span></span>
+    {[0, 6, 12, 18].map((h) => <span class="mono adm-heat-h" style={`grid-column: span 6`}>{String(h).padStart(2, '0')}</span>)}
+    {
+      heat.map((row, d) => (
+        <>
+          <span class="mono adm-heat-d">{WEEKDAYS[d]}</span>
+          {row.map((views, h) => (
+            <i
+              class="adm-heat-c"
+              data-l={level(views)}
+              title={`${WEEKDAYS[d]} ${hour(h)} UTC: ${num(views)} ${views === 1 ? 'view' : 'views'}`}
+            />
+          ))}
+        </>
+      ))
+    }
+  </div>
+  <p class="adm-heat-key mono-data">
+    <span>{busiest}</span>
+    <span class="adm-heat-scale" aria-hidden="true">
+      <span>Less</span>
+      {[0, 1, 2, 3, 4].map((l) => <i class="adm-heat-c" data-l={l} />)}
+      <span>More</span>
+    </span>
+  </p>
+</div>

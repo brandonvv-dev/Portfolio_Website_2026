@@ -1,0 +1,40 @@
+---
+interface Props {
+  range: number;
+  ranges: readonly number[];
+  tabs: readonly { id: string; label: string }[];
+  /** Visitors in the last five minutes, for the live chip. */
+  live: number;
+}
+
+const { range, ranges, tabs, live } = Astro.props;
+---
+
+<header class="adm-top">
+  <div class="adm-top-row">
+    <p class="adm-brand">
+      <a class="adm-mark" href="/admin/platform">Brandon van Vuuren</a>
+      <span class="mono">Back office</span>
+    </p>
+
+    <a class="adm-chip mono" href="#live" data-live-chip data-state={live ? 'on' : 'idle'}>
+      <i aria-hidden="true"></i>
+      <span><b data-live="m5">{live}</b> live now</span>
+    </a>
+
+    <nav class="adm-range mono" aria-label="Range in days">
+      <span>Days</span>
+      {ranges.map((days) => <a href={`?range=${days}`} data-range aria-current={days === range ? 'true' : undefined}>{days}</a>)}
+    </nav>
+
+    <form method="post" action="/admin/platform/logout">
+      <button class="adm-out mono" type="submit">Log out</button>
+    </form>
+  </div>
+</header>
+
+<div class="adm-tabs-bar">
+  <nav class="adm-tabs mono" aria-label="Views">
+    {tabs.map((tab) => <a href={`#${tab.id}`} data-tab-link={tab.id}>{tab.label}</a>)}
+  </nav>
+</div>

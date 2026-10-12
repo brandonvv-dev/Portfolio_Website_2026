@@ -1,0 +1,20 @@
+---
+// A tab's panel: the big heading in the display serif, a mono datum, then its sections on the 12-column grid.
+interface Props {
+  id: string;
+  title: string;
+  datum: string;
+}
+
+const { id, title, datum } = Astro.props;
+---
+
+<section id={`panel-${id}`} class="adm-panel" aria-labelledby={`h-${id}`} data-panel={id}>
+  <div class="wrap adm-wrap">
+    <header class="adm-panel-head">
+      <h2 id={`h-${id}`} class="adm-title">{title}</h2>
+      <p class="mono-data">{datum}</p>
+    </header>
+    <slot />
+  </div>
+</section>

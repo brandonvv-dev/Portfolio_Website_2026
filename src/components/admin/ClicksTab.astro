@@ -1,0 +1,54 @@
+---
+import type { Summary } from '../../server/analytics';
+import { delta, num, share } from './format';
+import type { Row } from './format';
+import Kpi from './Kpi.astro';
+import Panel from './Panel.astro';
+import Rows from './Rows.astro';
+import Tab from './Tab.astro';
+import { clickRows } from './names';
+
+interface Props {
+  s: Summary;
+  datum: string;
+}
+
+const { s, datum } = Astro.props;
+const since = `${s.range} days`;
+
+const kindTotal = (kind: string) => s.clicks.reduce((sum, click) => (click.kind === kind ? sum + click.count : sum), 0);
+const siteClicks = kindTotal('site');
+const cvLinks = kindTotal('cv');
+const cvGame = s.game.opens.find(({ key }) => key === 'cv')?.count ?? 0;
+const homeViews = s.pages.find(({ path }) => path === '/')?.views ?? 0;
+
+const cv: Row[] = [
+  { label: 'Links on the site', sub: 'clicks on the PDF link', value: cvLinks },
+  { label: 'In the game', sub: 'E or the button on the CV pad', value: cvGame },
+].filter((row) => row.value > 0);
+---
+
+<Tab id="clicks" title="Clicks" datum={datum}>
+  <div class="adm-kpis adm-span-12" data-cols="4">
+    <Kpi label="Client sites opened" value={num(siteClicks)} note="from the Sites section" />
+    <Kpi label="CV opens" value={num(s.totals.cvOpens)} delta={delta(s.totals.cvOpens, s.previous.cvOpens)} since={since} series={s.days.map((d) => d.cvOpens)} />
+    <Kpi label="Contact clicks" value={num(kindTotal('contact'))} note="email, LinkedIn, GitHub" />
+    <Kpi label="Drive link clicks" value={num(kindTotal('drive'))} note={homeViews ? `${share(kindTotal('drive'), homeViews)} of home page views` : 'from the home page'} />
+  </div>
+
+  <Panel label="Client sites opened" datum="Outside links from the Sites section" span={7}>
+    <Rows rows={clickRows(s.clicks, ['site'])} limit={12} head={{ value: 'Clicks' }} empty="Each click on a client site's link is counted as it happens, with the site's name looked up here." />
+  </Panel>
+
+  <Panel label="CV" datum="Opened or downloaded: both are one click" span={5}>
+    <Rows rows={cv} lead={false} head={{ value: 'Opens' }} empty="Clicks on the PDF link, and E on the CV pad in the game, are counted as they happen." />
+  </Panel>
+
+  <Panel label="Contact" datum="Email, LinkedIn, GitHub" span={5}>
+    <Rows rows={clickRows(s.clicks, ['contact'])} head={{ value: 'Clicks' }} empty="Clicks on the contact rows are counted as they happen." />
+  </Panel>
+
+  <Panel label="Other outside links" datum="Repositories, ventures, anything else that leaves the site" span={7}>
+    <Rows rows={clickRows(s.clicks, ['out'])} limit={12} head={{ value: 'Clicks' }} empty="Any link that leaves the site is counted as it happens." />
+  </Panel>
+</Tab>

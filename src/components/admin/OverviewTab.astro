@@ -1,0 +1,73 @@
+---
+import type { Summary } from '../../server/analytics';
+import { delta, dur, num } from './format';
+import type { Row } from './format';
+import Empty from './Empty.astro';
+import Heatmap from './Heatmap.astro';
+import Kpi from './Kpi.astro';
+import LineChart from './LineChart.astro';
+import Panel from './Panel.astro';
+import Rows from './Rows.astro';
+import Tab from './Tab.astro';
+import { clickRows, referrerName } from './names';
+
+interface Props {
+  s: Summary;
+  datum: string;
+}
+
+const { s, datum } = Astro.props;
+const { totals: t, previous: before } = s;
+const since = `${s.range} days`;
+const daily = (pick: (day: Summary['days'][number]) => number) => s.days.map(pick);
+
+// Moving between the site's own pages is not a place a visit came from.
+const sources: Row[] = s.referrers
+  .filter(({ key }) => key !== 'internal')
+  .map(({ key, count }) => ({ label: referrerName(key), value: count }));
+const clicks = clickRows(s.clicks, ['site', 'cv', 'contact', 'drive', 'out'], true);
+---
+
+<Tab id="overview" title="Overview" datum={datum}>
+  <div class="adm-kpis adm-span-12">
+    <Kpi label="Page views" value={num(t.views)} delta={delta(t.views, before.views)} since={since} series={daily((d) => d.views)} />
+    <Kpi label="Visitors" value={num(t.visitors)} delta={delta(t.visitors, before.visitors)} since={since} series={daily((d) => d.visitors)} />
+    <Kpi label="Time on page" value={dur(t.avgSecs)} delta={delta(t.avgSecs, before.avgSecs)} since={since} series={daily((d) => d.avgSecs)} />
+    <Kpi label="Scroll depth" value={t.avgDepth ? `${Math.round(t.avgDepth)}%` : '-'} delta={delta(t.avgDepth, before.avgDepth, true)} since={since} series={daily((d) => d.avgDepth)} />
+    <Kpi label="Game starts" value={num(t.gameStarts)} delta={delta(t.gameStarts, before.gameStarts)} since={since} series={daily((d) => d.gameStarts)} />
+    <Kpi label="CV opens" value={num(t.cvOpens)} delta={delta(t.cvOpens, before.cvOpens)} since={since} series={daily((d) => d.cvOpens)} />
+  </div>
+
+  <Panel label="Daily views and visitors" span={12}>
+    <p slot="aside" class="adm-legend mono-data" aria-hidden="true">
+      <span><i class="adm-key-views"></i>Views</span>
+      <span><i class="adm-key-visitors"></i>Visitors</span>
+      <span><i class="adm-key-weekend"></i>Weekend</span>
+    </p>
+    {
+      t.views > 0 ? (
+        <LineChart days={s.days} />
+      ) : (
+        <Empty line="Every page load sends a view from the site within ten seconds; the chart draws itself from the first one." />
+      )
+    }
+  </Panel>
+
+  <Panel label="When they visit" datum="Views by weekday and hour, UTC (South Africa is UTC+2)" span={8}>
+    {
+      t.views > 0 ? (
+        <Heatmap heat={s.heat} />
+      ) : (
+        <Empty line="Each view is filed under its weekday and UTC hour as it arrives." />
+      )
+    }
+  </Panel>
+
+  <Panel label="Where they come from" datum="Views" span={4}>
+    <Rows rows={sources} limit={6} empty="The browser's referrer, host only; a visit with none shows as direct." />
+  </Panel>
+
+  <Panel label="What they click" datum="Outside links, the CV, the Drive link" span={12}>
+    <Rows rows={clicks} limit={6} empty="Clicks on outside links, the CV and the Drive link are counted as they happen." />
+  </Panel>
+</Tab>

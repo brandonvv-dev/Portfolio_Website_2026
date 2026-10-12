@@ -1,0 +1,25 @@
+---
+// One hit in the LIVE feed. The page renders the first fifty with this; the same markup, empty, is the
+// <template> the browser script clones for hits that arrive later, so the two cannot drift apart.
+import { ago } from './format';
+import type { LiveRow } from './format';
+
+interface Props {
+  row?: LiveRow;
+  now?: number;
+}
+
+const { row, now = 0 } = Astro.props;
+---
+
+<li class="adm-feed-row">
+  <time class="mono-data adm-feed-time" data-slot="time" data-at={row?.at ?? ''}>{row ? ago(row.at, now) : ''}</time>
+  <span class="mono adm-cat" data-slot="category" data-c={row?.category ?? ''}>{row?.category ?? ''}</span>
+  <span class="adm-feed-what">
+    <b class="mono-data" data-slot="path">{row?.path ?? ''}</b>
+    <span class="mono-data" data-slot="what">{row?.what ?? ''}</span>
+  </span>
+  <span class="mono-data" data-slot="country">{row?.country ?? ''}</span>
+  <span class="mono-data" data-slot="device">{row?.device ?? ''}</span>
+  <span class="mono-data adm-dim" data-slot="who">{row ? `#${row.who}` : ''}</span>
+</li>
