@@ -78,7 +78,7 @@ bash
 
 ```bash
 GITHUB_TOKEN=ghp_your_token_here
-GITHUB_USERNAME=Brandon255-rgb
+GITHUB_USERNAME=brandonvv-dev
 ```
 
 6. Add to `.gitignore`:
@@ -117,7 +117,7 @@ typescript
   description:"Brief one-liner",
   longDescription:"Detailed description with impact/results",
   tech:["React","Node.js","etc"],
-  github:"https://github.com/Brandon255-rgb/repo-name",
+  github:"https://github.com/brandonvv-dev/repo-name",
   live:"https://your-live-demo.com",
   image:"/images/project1.jpg",
   featured:true,
@@ -189,7 +189,7 @@ Follow prompts:
 1. Go to: Vercel Dashboard → Your Project → Settings → Environment Variables
 2. Add:
    * `GITHUB_TOKEN` = your token
-   * `GITHUB_USERNAME` = Brandon255-rgb
+   * `GITHUB_USERNAME` = brandonvv-dev
 3. Redeploy to apply changes
 
 ---
